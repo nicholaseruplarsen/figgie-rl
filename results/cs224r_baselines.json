@@ -1,0 +1,62 @@
+{
+ "baseline tournament fixed seats, 200 games": {
+  "Bayesian@0": {
+   "profit": 37.7,
+   "ci95": 8.9,
+   "win": 0.74,
+   "lifts": 5.2,
+   "quote_accept": 0.01
+  },
+  "FairValue@1": {
+   "profit": -6.6,
+   "ci95": 5.5,
+   "win": 0.122,
+   "lifts": 0.02,
+   "quote_accept": 0.162
+  },
+  "MarketMaker@2": {
+   "profit": -13.6,
+   "ci95": 5.0,
+   "win": 0.077,
+   "lifts": 0,
+   "quote_accept": 0.06
+  },
+  "Conservative@3": {
+   "profit": -17.5,
+   "ci95": 4.4,
+   "win": 0.06,
+   "lifts": 0.01,
+   "quote_accept": 0.018
+  }
+ },
+ "baseline tournament fixed seats, 2000 games": {
+  "Bayesian@0": {
+   "profit": 21.8,
+   "ci95": 3.1,
+   "win": 0.637,
+   "lifts": 5.38,
+   "quote_accept": 0.01
+  },
+  "FairValue@1": {
+   "profit": 2.8,
+   "ci95": 2.1,
+   "win": 0.187,
+   "lifts": 0.05,
+   "quote_accept": 0.169
+  },
+  "MarketMaker@2": {
+   "profit": -11.3,
+   "ci95": 1.6,
+   "win": 0.09,
+   "lifts": 0,
+   "quote_accept": 0.058
+  },
+  "Conservative@3": {
+   "profit": -13.2,
+   "ci95": 1.6,
+   "win": 0.085,
+   "lifts": 0.0,
+   "quote_accept": 0.019
+  }
+ }
+}
