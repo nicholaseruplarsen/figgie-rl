@@ -64,6 +64,9 @@ class Config:
     ticks: int = 240
     max_price: int = 30
     cancel_on_trade: bool = True
+    # Only used with cancel_on_trade=False: whether a filled resting quote is
+    # removed (figment) or stays until the owner runs out of cards/cash (Figgie-bot).
+    fill_removes_quote: bool = True
 
 
 class Obs:
@@ -163,10 +166,11 @@ class Game:
                 self.asks[p] = [0] * 4
         else:
             # Only drop the filled quote and quotes that can no longer be honoured.
-            if buyer_aggressed:
-                self.asks[seller][s] = 0
-            else:
-                self.bids[buyer][s] = 0
+            if self.cfg.fill_removes_quote:
+                if buyer_aggressed:
+                    self.asks[seller][s] = 0
+                else:
+                    self.bids[buyer][s] = 0
             for t in range(4):
                 if self.bids[buyer][t] > self.cash[buyer]:
                     self.bids[buyer][t] = 0
