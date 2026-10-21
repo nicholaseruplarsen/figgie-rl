@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from ..actions import encode, legal_mask, LIFT
 from ..agents import cs224r as C
 from ..engine import play
-from .env import FiggieEnv
+from .vec import VecEnv
 from .features import Featurizer
 from .policy import ActorCriticRecurrent, PolicyAgent, H
 
@@ -150,10 +150,10 @@ def ppo(args):
         net.load_state_dict(torch.load(args.init, weights_only=True))
     opt = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
     pool = Pool(p_sp=args.p_sp)
-    envs = [FiggieEnv(pool.sampler(), seed=args.seed * 1000 + i, beta=args.beta, gamma=args.gamma,
-                      lift_alpha=args.lift_alpha) for i in range(args.envs)]
+    venv = VecEnv(args.envs, args.procs, args.seed,
+                  dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha), dict(p_sp=args.p_sp))
     B, T = args.envs, args.steps
-    cur = [e.reset() for e in envs]
+    Xc, Mc = venv.reset()
     h = torch.zeros(B, H)
     start = torch.ones(B)
     os.makedirs(args.out, exist_ok=True)
@@ -167,29 +167,24 @@ def ppo(args):
         Ds = torch.zeros(T, B)
         Hs = torch.zeros(T, B, H)
         infos = []
+        venv.sync(pool)
         net.eval()
         with torch.no_grad():
             for t in range(T):
-                X = torch.from_numpy(np.stack([c[0] for c in cur]))
-                M = torch.from_numpy(np.stack([c[1] for c in cur]))
+                X, M = torch.from_numpy(Xc), torch.from_numpy(Mc)
                 h = h * (1 - start).unsqueeze(-1)
                 Hs[t], Ds[t] = h, start
                 logits, v, h = net.step(X, h, M)
                 dist = torch.distributions.Categorical(logits=logits)
                 a = dist.sample()
                 Xs[t], Ms[t], As[t], LPs[t], Vs[t] = X, M, a, dist.log_prob(a), v
-                start = torch.zeros(B)
-                for i, e in enumerate(envs):
-                    f, m, r, d, info = e.step(int(a[i]))
-                    Rs[t, i] = r
-                    if d:
-                        infos.append(info)
-                        pool.record(info)
-                        f, m = e.reset()
-                        start[i] = 1
-                    cur[i] = (f, m)
-            Xl = torch.from_numpy(np.stack([c[0] for c in cur]))
-            Ml = torch.from_numpy(np.stack([c[1] for c in cur]))
+                Xc, Mc, R, D, new = venv.step(a.numpy())
+                Rs[t] = torch.from_numpy(R)
+                start = torch.from_numpy(D.astype(np.float32))
+                for info in new:
+                    infos.append(info)
+                    pool.record(info)
+            Xl, Ml = torch.from_numpy(Xc), torch.from_numpy(Mc)
             _, v_last, _ = net.step(Xl, h * (1 - start).unsqueeze(-1), Ml)
         # GAE; Ds[t+1]==1 means step t ended its episode.
         adv = torch.zeros(T, B)
@@ -238,6 +233,7 @@ def ppo(args):
         if upd % 25 == 0 or upd == args.updates:
             torch.save(net.state_dict(), os.path.join(args.out, f"update_{upd}.pt"))
     torch.save(net.state_dict(), os.path.join(args.out, "final.pt"))
+    venv.close()
 
 
 def main():
@@ -269,6 +265,7 @@ def main():
     p.add_argument("--warmup", type=int, default=50)
     p.add_argument("--snap-every", type=int, default=20)
     p.add_argument("--threads", type=int, default=4)
+    p.add_argument("--procs", type=int, default=4, help="env worker processes")
     a = p.parse_args()
     if a.mode == "bc":
         a.epochs, a.lr = a.epochs or 10, a.lr or 1e-3
