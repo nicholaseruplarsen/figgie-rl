@@ -1,4 +1,4 @@
-# Figgie agent zoo
+# figgie-rl
 
 One shared Figgie engine (standard rules, CS224R 240-tick / 257-action discretisation) with
 agents re-implemented from four public sources, a reproduction of the CS224R PPO+PFSP agent,
