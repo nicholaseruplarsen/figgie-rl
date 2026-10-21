@@ -28,13 +28,21 @@ class ActorCriticRecurrent(nn.Module):
 
     def unroll(self, x, h0, mask, done):
         """x: [T, B, D]; done[t] marks that step t starts a new episode."""
-        logits, values, h = [], [], h0
-        for t in range(x.shape[0]):
-            h = h * (1 - done[t]).unsqueeze(-1)
-            lg, v, h = self.step(x[t], h, mask[t])
-            logits.append(lg)
-            values.append(v)
-        return torch.stack(logits), torch.stack(values), h
+        # Run the fused GRU kernel over the spans between episode resets
+        # (same weights as the GRUCell, so it matches step() exactly).
+        e = self.enc(x)
+        g = self.gru
+        cuts = [0] + [t for t in range(1, x.shape[0]) if bool(done[t].any())] + [x.shape[0]]
+        hs, h = [], h0
+        for a, b in zip(cuts[:-1], cuts[1:]):
+            h = h * (1 - done[a]).unsqueeze(-1)
+            out, hn = torch._VF.gru(e[a:b], h.unsqueeze(0), [g.weight_ih, g.weight_hh, g.bias_ih, g.bias_hh],
+                                     True, 1, 0.0, self.training, False, False)
+            hs.append(out)
+            h = hn[0]
+        hs = torch.cat(hs)
+        logits = self.actor(hs).masked_fill(~mask, -1e9)
+        return logits, self.critic(hs).squeeze(-1), h
 
 
 class PolicyAgent:
