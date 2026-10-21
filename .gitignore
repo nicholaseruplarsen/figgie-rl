@@ -1,0 +1,8 @@
+third_party/
+__pycache__/
+*.pyc
+.pytest_cache/
+runs/
+checkpoints/*.pt
+!checkpoints/ppo_v2_final.pt
+!checkpoints/bc.pt
