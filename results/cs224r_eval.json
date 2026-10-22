@@ -1,0 +1,602 @@
+{
+ "baseline tournament fixed seats, 200 games": {
+  "Bayesian@0": {
+   "profit": 37.7,
+   "ci95": 8.9,
+   "win": 0.74,
+   "lifts": 5.2,
+   "quote_accept": 0.01
+  },
+  "FairValue@1": {
+   "profit": -6.6,
+   "ci95": 5.5,
+   "win": 0.122,
+   "lifts": 0.02,
+   "quote_accept": 0.162
+  },
+  "MarketMaker@2": {
+   "profit": -13.6,
+   "ci95": 5.0,
+   "win": 0.077,
+   "lifts": 0,
+   "quote_accept": 0.06
+  },
+  "Conservative@3": {
+   "profit": -17.5,
+   "ci95": 4.4,
+   "win": 0.06,
+   "lifts": 0.01,
+   "quote_accept": 0.018
+  }
+ },
+ "baseline tournament fixed seats, 2000 games": {
+  "Bayesian@0": {
+   "profit": 21.8,
+   "ci95": 3.1,
+   "win": 0.637,
+   "lifts": 5.38,
+   "quote_accept": 0.01
+  },
+  "FairValue@1": {
+   "profit": 2.8,
+   "ci95": 2.1,
+   "win": 0.187,
+   "lifts": 0.05,
+   "quote_accept": 0.169
+  },
+  "MarketMaker@2": {
+   "profit": -11.3,
+   "ci95": 1.6,
+   "win": 0.09,
+   "lifts": 0,
+   "quote_accept": 0.058
+  },
+  "Conservative@3": {
+   "profit": -13.2,
+   "ci95": 1.6,
+   "win": 0.085,
+   "lifts": 0.0,
+   "quote_accept": 0.019
+  }
+ },
+ "v1 vs 3xRandom": {
+  "PPO@0": {
+   "profit": 135.0,
+   "ci95": 4.6,
+   "win": 0.759,
+   "lifts": 3.06,
+   "quote_accept": 0.079
+  },
+  "Random@1": {
+   "profit": -45.5,
+   "ci95": 5.9,
+   "win": 0.079,
+   "lifts": 17.21,
+   "quote_accept": 0.152
+  },
+  "Random@2": {
+   "profit": -46.6,
+   "ci95": 6.3,
+   "win": 0.076,
+   "lifts": 17.13,
+   "quote_accept": 0.151
+  },
+  "Random@3": {
+   "profit": -42.9,
+   "ci95": 6.1,
+   "win": 0.086,
+   "lifts": 17.36,
+   "quote_accept": 0.151
+  }
+ },
+ "v1 vs FV + 2xR": {
+  "PPO@0": {
+   "profit": 112.0,
+   "ci95": 4.1,
+   "win": 0.566,
+   "lifts": 1.81,
+   "quote_accept": 0.065
+  },
+  "FairValue@1": {
+   "profit": 92.0,
+   "ci95": 2.2,
+   "win": 0.374,
+   "lifts": 0.77,
+   "quote_accept": 0.108
+  },
+  "Random@2": {
+   "profit": -102.1,
+   "ci95": 6.3,
+   "win": 0.033,
+   "lifts": 17.23,
+   "quote_accept": 0.134
+  },
+  "Random@3": {
+   "profit": -102.0,
+   "ci95": 6.3,
+   "win": 0.028,
+   "lifts": 17.55,
+   "quote_accept": 0.132
+  }
+ },
+ "v1 vs Bayes + 2xR": {
+  "PPO@0": {
+   "profit": 106.7,
+   "ci95": 4.0,
+   "win": 0.377,
+   "lifts": 1.92,
+   "quote_accept": 0.068
+  },
+  "Bayesian@1": {
+   "profit": 125.1,
+   "ci95": 2.7,
+   "win": 0.592,
+   "lifts": 1.9,
+   "quote_accept": 0.085
+  },
+  "Random@2": {
+   "profit": -118.6,
+   "ci95": 6.1,
+   "win": 0.018,
+   "lifts": 17.97,
+   "quote_accept": 0.128
+  },
+  "Random@3": {
+   "profit": -113.2,
+   "ci95": 6.1,
+   "win": 0.013,
+   "lifts": 18.24,
+   "quote_accept": 0.127
+  }
+ },
+ "v1 vs FV + Bayes + R": {
+  "PPO@0": {
+   "profit": 66.0,
+   "ci95": 3.6,
+   "win": 0.256,
+   "lifts": 0.96,
+   "quote_accept": 0.04
+  },
+  "FairValue@1": {
+   "profit": 57.0,
+   "ci95": 1.7,
+   "win": 0.137,
+   "lifts": 0.38,
+   "quote_accept": 0.152
+  },
+  "Bayesian@2": {
+   "profit": 112.0,
+   "ci95": 4.1,
+   "win": 0.608,
+   "lifts": 3.56,
+   "quote_accept": 0.089
+  },
+  "Random@3": {
+   "profit": -235.0,
+   "ci95": 4.9,
+   "win": 0.0,
+   "lifts": 17.29,
+   "quote_accept": 0.066
+  }
+ },
+ "v1 vs FV + Cons + MM": {
+  "PPO@0": {
+   "profit": 2.1,
+   "ci95": 3.4,
+   "win": 0.275,
+   "lifts": 0.41,
+   "quote_accept": 0.002
+  },
+  "FairValue@1": {
+   "profit": -0.3,
+   "ci95": 3.2,
+   "win": 0.25,
+   "lifts": 0.06,
+   "quote_accept": 0.065
+  },
+  "Conservative@2": {
+   "profit": -2.5,
+   "ci95": 3.0,
+   "win": 0.225,
+   "lifts": 0.02,
+   "quote_accept": 0.015
+  },
+  "MarketMaker@3": {
+   "profit": 0.7,
+   "ci95": 3.2,
+   "win": 0.25,
+   "lifts": 0,
+   "quote_accept": 0.023
+  }
+ },
+ "v1 vs FV + Bayes + MM": {
+  "PPO@0": {
+   "profit": -6.2,
+   "ci95": 3.2,
+   "win": 0.187,
+   "lifts": 0.6,
+   "quote_accept": 0.009
+  },
+  "FairValue@1": {
+   "profit": -2.0,
+   "ci95": 2.4,
+   "win": 0.108,
+   "lifts": 0.13,
+   "quote_accept": 0.164
+  },
+  "Bayesian@2": {
+   "profit": 20.4,
+   "ci95": 4.4,
+   "win": 0.622,
+   "lifts": 6.19,
+   "quote_accept": 0.012
+  },
+  "MarketMaker@3": {
+   "profit": -12.1,
+   "ci95": 2.2,
+   "win": 0.083,
+   "lifts": 0,
+   "quote_accept": 0.059
+  }
+ },
+ "v2 vs 3xRandom": {
+  "PPO@0": {
+   "profit": 277.5,
+   "ci95": 4.8,
+   "win": 0.991,
+   "lifts": 17.45,
+   "quote_accept": 0.099
+  },
+  "Random@1": {
+   "profit": -96.2,
+   "ci95": 6.1,
+   "win": 0.001,
+   "lifts": 18.48,
+   "quote_accept": 0.173
+  },
+  "Random@2": {
+   "profit": -89.8,
+   "ci95": 6.0,
+   "win": 0.006,
+   "lifts": 18.14,
+   "quote_accept": 0.172
+  },
+  "Random@3": {
+   "profit": -91.4,
+   "ci95": 6.1,
+   "win": 0.002,
+   "lifts": 18.43,
+   "quote_accept": 0.171
+  }
+ },
+ "v2 vs FV + 2xR": {
+  "PPO@0": {
+   "profit": 244.2,
+   "ci95": 5.0,
+   "win": 0.97,
+   "lifts": 16.52,
+   "quote_accept": 0.081
+  },
+  "FairValue@1": {
+   "profit": 83.5,
+   "ci95": 2.1,
+   "win": 0.029,
+   "lifts": 0.75,
+   "quote_accept": 0.116
+  },
+  "Random@2": {
+   "profit": -163.0,
+   "ci95": 5.6,
+   "win": 0.0,
+   "lifts": 18.86,
+   "quote_accept": 0.159
+  },
+  "Random@3": {
+   "profit": -164.6,
+   "ci95": 5.7,
+   "win": 0.002,
+   "lifts": 19.14,
+   "quote_accept": 0.158
+  }
+ },
+ "v2 vs Bayes + 2xR": {
+  "PPO@0": {
+   "profit": 232.9,
+   "ci95": 4.7,
+   "win": 0.918,
+   "lifts": 15.18,
+   "quote_accept": 0.078
+  },
+  "Bayesian@1": {
+   "profit": 111.8,
+   "ci95": 2.5,
+   "win": 0.081,
+   "lifts": 1.41,
+   "quote_accept": 0.092
+  },
+  "Random@2": {
+   "profit": -171.9,
+   "ci95": 5.6,
+   "win": 0.001,
+   "lifts": 19.36,
+   "quote_accept": 0.152
+  },
+  "Random@3": {
+   "profit": -172.8,
+   "ci95": 5.7,
+   "win": 0.0,
+   "lifts": 19.53,
+   "quote_accept": 0.153
+  }
+ },
+ "v2 vs FV + Bayes + R": {
+  "PPO@0": {
+   "profit": 135.6,
+   "ci95": 4.9,
+   "win": 0.632,
+   "lifts": 12.9,
+   "quote_accept": 0.04
+  },
+  "FairValue@1": {
+   "profit": 47.9,
+   "ci95": 1.6,
+   "win": 0.041,
+   "lifts": 0.35,
+   "quote_accept": 0.162
+  },
+  "Bayesian@2": {
+   "profit": 94.4,
+   "ci95": 3.6,
+   "win": 0.327,
+   "lifts": 2.55,
+   "quote_accept": 0.099
+  },
+  "Random@3": {
+   "profit": -277.9,
+   "ci95": 4.3,
+   "win": 0.0,
+   "lifts": 16.97,
+   "quote_accept": 0.096
+  }
+ },
+ "v2 vs FV + Cons + MM": {
+  "PPO@0": {
+   "profit": 21.5,
+   "ci95": 4.2,
+   "win": 0.518,
+   "lifts": 5.04,
+   "quote_accept": 0.003
+  },
+  "FairValue@1": {
+   "profit": -6.1,
+   "ci95": 2.8,
+   "win": 0.18,
+   "lifts": 0.02,
+   "quote_accept": 0.202
+  },
+  "Conservative@2": {
+   "profit": -8.8,
+   "ci95": 2.7,
+   "win": 0.14,
+   "lifts": 0.01,
+   "quote_accept": 0.029
+  },
+  "MarketMaker@3": {
+   "profit": -6.6,
+   "ci95": 2.7,
+   "win": 0.162,
+   "lifts": 0,
+   "quote_accept": 0.123
+  }
+ },
+ "v2 vs FV + Bayes + MM": {
+  "PPO@0": {
+   "profit": 12.7,
+   "ci95": 4.6,
+   "win": 0.528,
+   "lifts": 7.08,
+   "quote_accept": 0.005
+  },
+  "FairValue@1": {
+   "profit": -1.4,
+   "ci95": 2.5,
+   "win": 0.103,
+   "lifts": 0.08,
+   "quote_accept": 0.167
+  },
+  "Bayesian@2": {
+   "profit": -3.2,
+   "ci95": 3.9,
+   "win": 0.294,
+   "lifts": 3.44,
+   "quote_accept": 0.023
+  },
+  "MarketMaker@3": {
+   "profit": -8.1,
+   "ci95": 2.0,
+   "win": 0.075,
+   "lifts": 0,
+   "quote_accept": 0.095
+  }
+ },
+ "scratch vs 3xRandom": {
+  "PPO@0": {
+   "profit": 178.3,
+   "ci95": 2.1,
+   "win": 0.953,
+   "lifts": 1.36,
+   "quote_accept": 0.068
+  },
+  "Random@1": {
+   "profit": -55.5,
+   "ci95": 6.2,
+   "win": 0.013,
+   "lifts": 18.24,
+   "quote_accept": 0.153
+  },
+  "Random@2": {
+   "profit": -61.5,
+   "ci95": 6.1,
+   "win": 0.012,
+   "lifts": 18.2,
+   "quote_accept": 0.153
+  },
+  "Random@3": {
+   "profit": -61.3,
+   "ci95": 6.3,
+   "win": 0.022,
+   "lifts": 18.41,
+   "quote_accept": 0.153
+  }
+ },
+ "scratch vs FV + 2xR": {
+  "PPO@0": {
+   "profit": 140.0,
+   "ci95": 1.8,
+   "win": 0.849,
+   "lifts": 0.57,
+   "quote_accept": 0.059
+  },
+  "FairValue@1": {
+   "profit": 92.1,
+   "ci95": 2.1,
+   "win": 0.138,
+   "lifts": 0.9,
+   "quote_accept": 0.116
+  },
+  "Random@2": {
+   "profit": -116.1,
+   "ci95": 6.1,
+   "win": 0.006,
+   "lifts": 18.47,
+   "quote_accept": 0.133
+  },
+  "Random@3": {
+   "profit": -116.0,
+   "ci95": 5.8,
+   "win": 0.007,
+   "lifts": 19.05,
+   "quote_accept": 0.13
+  }
+ },
+ "scratch vs Bayes + 2xR": {
+  "PPO@0": {
+   "profit": 144.1,
+   "ci95": 1.7,
+   "win": 0.641,
+   "lifts": 0.58,
+   "quote_accept": 0.057
+  },
+  "Bayesian@1": {
+   "profit": 128.6,
+   "ci95": 2.7,
+   "win": 0.357,
+   "lifts": 2.0,
+   "quote_accept": 0.089
+  },
+  "Random@2": {
+   "profit": -132.8,
+   "ci95": 5.7,
+   "win": 0.002,
+   "lifts": 18.94,
+   "quote_accept": 0.129
+  },
+  "Random@3": {
+   "profit": -139.9,
+   "ci95": 5.5,
+   "win": 0.0,
+   "lifts": 19.28,
+   "quote_accept": 0.128
+  }
+ },
+ "scratch vs FV + Bayes + R": {
+  "PPO@0": {
+   "profit": 62.6,
+   "ci95": 1.9,
+   "win": 0.194,
+   "lifts": 0.26,
+   "quote_accept": 0.036
+  },
+  "FairValue@1": {
+   "profit": 54.7,
+   "ci95": 1.8,
+   "win": 0.172,
+   "lifts": 0.39,
+   "quote_accept": 0.156
+  },
+  "Bayesian@2": {
+   "profit": 108.7,
+   "ci95": 4.6,
+   "win": 0.634,
+   "lifts": 3.73,
+   "quote_accept": 0.089
+  },
+  "Random@3": {
+   "profit": -226.0,
+   "ci95": 4.8,
+   "win": 0.0,
+   "lifts": 18.15,
+   "quote_accept": 0.062
+  }
+ },
+ "scratch vs FV + Cons + MM": {
+  "PPO@0": {
+   "profit": 0.2,
+   "ci95": 3.8,
+   "win": 0.3,
+   "lifts": 0.54,
+   "quote_accept": 0.011
+  },
+  "FairValue@1": {
+   "profit": 2.1,
+   "ci95": 2.9,
+   "win": 0.266,
+   "lifts": 0.01,
+   "quote_accept": 0.052
+  },
+  "Conservative@2": {
+   "profit": -2.4,
+   "ci95": 2.9,
+   "win": 0.196,
+   "lifts": 0.0,
+   "quote_accept": 0.012
+  },
+  "MarketMaker@3": {
+   "profit": 0.1,
+   "ci95": 3.2,
+   "win": 0.238,
+   "lifts": 0,
+   "quote_accept": 0.019
+  }
+ },
+ "scratch vs FV + Bayes + MM": {
+  "PPO@0": {
+   "profit": -17.3,
+   "ci95": 3.7,
+   "win": 0.202,
+   "lifts": 0.92,
+   "quote_accept": 0.014
+  },
+  "FairValue@1": {
+   "profit": 5.2,
+   "ci95": 2.4,
+   "win": 0.127,
+   "lifts": 0.04,
+   "quote_accept": 0.125
+  },
+  "Bayesian@2": {
+   "profit": 19.6,
+   "ci95": 4.4,
+   "win": 0.564,
+   "lifts": 4.53,
+   "quote_accept": 0.011
+  },
+  "MarketMaker@3": {
+   "profit": -7.5,
+   "ci95": 2.4,
+   "win": 0.108,
+   "lifts": 0,
+   "quote_accept": 0.068
+  }
+ }
+}

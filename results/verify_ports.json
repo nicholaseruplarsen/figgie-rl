@@ -1,80 +1,80 @@
 {
  "figment posterior max abs diff": 0.0,
  "figment decision agreement": {
-  "Fundamental": "12000/12000",
-  "BayesianMM": "12000/12000",
-  "Momentum": "12000/12000"
+  "Fundamental": "48000/48000",
+  "BayesianMM": "48000/48000",
+  "Momentum": "48000/48000"
  },
  "figment original P&L (Fund, BMM, Mom, Random table)": {
   "Fundamental": [
-   39.7,
-   7.3
+   38.6,
+   3.8
   ],
   "BayesianMM": [
-   49.9,
-   5.1
+   47.3,
+   2.6
   ],
   "Momentum": [
-   -33.1,
-   9.6
+   -30.0,
+   4.9
   ]
  },
  "figment port P&L on shared engine (compat, 60 ticks)": {
   "Fundamental": [
-   21.4,
-   7.9
+   25.0,
+   4.1
   ],
   "BayesianMM": [
-   31.5,
-   5.3
+   31.7,
+   2.9
   ],
   "Momentum": [
-   -29.6,
-   9.1
+   -26.8,
+   4.6
   ]
  },
  "Figgie-bot posterior max abs diff": 0.0,
  "Figgie-bot card_values max abs diff": 0.0,
  "Figgie-bot decision agreement": {
-  "PotMM": "4000/4000",
-  "HandMM": "4000/4000",
-  "FlowMM": "4000/4000",
-  "ConstVal": "4000/4000"
+  "PotMM": "16000/16000",
+  "HandMM": "16000/16000",
+  "FlowMM": "16000/16000",
+  "ConstVal": "16000/16000"
  },
  "Figgie-bot original E1 P&L": {
   "PotMM": [
-   6.0,
-   8.8
+   5.8,
+   4.1
   ],
   "HandMM": [
-   2.3,
-   3.1
+   1.0,
+   1.6
   ],
   "FlowMM": [
-   0.3,
-   8.7
+   3.2,
+   4.3
   ],
   "FixedSpread": [
-   -8.5,
-   4.1
+   -9.9,
+   2.0
   ]
  },
  "Figgie-bot port E1 P&L on shared engine (compat)": {
   "PotMM": [
-   4.7,
-   7.7
+   5.9,
+   4.0
   ],
   "HandMM": [
-   -2.7,
-   3.6
+   -0.8,
+   1.7
   ],
   "FlowMM": [
-   8.8,
-   8.2
+   5.2,
+   4.2
   ],
   "FixedSpread": [
-   -10.7,
-   3.7
+   -10.2,
+   1.9
   ]
  }
 }
