@@ -21,7 +21,7 @@ from figgie.engine import DECKS, Game, Obs, play  # noqa: E402
 
 TABLE = ["fig.BayesianMM", "Bayesian", "fb.PotMM", "fig.Fundamental"]
 SYM = ["♠", "♣", "♥", "♦"]
-COL = ["#222222", "#2e7d32", "#c62828", "#ef6c00"]
+COL = ["#111111", "#111111", "#c62828", "#c62828"]  # black spades/clubs, red hearts/diamonds
 
 
 def agents_for(i):
@@ -68,16 +68,14 @@ def main():
     s = snaps[t]
 
     fig, ax = plt.subplots(figsize=(10, 7.2))
-    ax.set_xlim(0, 10); ax.set_ylim(0, 7.2); ax.axis("off")
+    ax.set_xlim(0, 10); ax.set_ylim(0, 6.75); ax.axis("off")
     ax.add_patch(FancyBboxPatch((2.6, 1.9), 4.8, 3.3, boxstyle="round,pad=0.05,rounding_size=0.6",
                                 fc="#e8f1e4", ec="#7a9a6a", lw=1.5))
-    ax.text(5, 7.0, f"Figgie, tick {t + 1} of 240    pot $200    goal suit: hidden (actually {SYM[g.goal]})",
-            ha="center", va="top", fontsize=12, weight="bold")
 
     # Order book in the middle.
-    ax.text(5, 4.95, "order book (best quotes, any player can trade)", ha="center", fontsize=9, color="#335")
+    ax.text(5, 4.95, "order book: best quote per suit", ha="center", fontsize=10, color="#335", weight="bold")
     hdr_y = 4.6
-    for x, h in [(3.35, "bid"), (4.35, "by"), (5.0, "suit"), (5.65, "ask"), (6.6, "by")]:
+    for x, h in [(3.3, "bidder"), (4.15, "bid"), (5.0, "suit"), (5.85, "ask"), (6.7, "asker")]:
         ax.text(x, hdr_y, h, ha="center", fontsize=8.5, color="grey")
     for su in range(4):
         y = 4.2 - su * 0.42
@@ -85,12 +83,12 @@ def main():
         asks = [(s["asks"][p][su], p) for p in range(4) if s["asks"][p][su] > 0]
         ask = min(asks) if asks else (0, -1)
         ax.text(5.0, y, SYM[su], ha="center", fontsize=15, color=COL[su])
-        ax.text(3.35, y, f"${bid[0]}" if bid[0] else "–", ha="center", fontsize=10.5)
-        ax.text(4.35, y, f"P{bid[1]}" if bid[0] else "", ha="center", fontsize=9, color="#555")
-        ax.text(5.65, y, f"${ask[0]}" if ask[0] else "–", ha="center", fontsize=10.5)
-        ax.text(6.6, y, f"P{ask[1]}" if ask[0] else "", ha="center", fontsize=9, color="#555")
-    ax.text(5, 2.25, "every trade is public: tick, suit, price, buyer, seller", ha="center",
-            fontsize=8.5, style="italic", color="#335")
+        ax.text(4.15, y, f"${bid[0]}" if bid[0] else "–", ha="center", fontsize=10.5)
+        ax.text(3.3, y, f"P{bid[1]}" if bid[0] else "", ha="center", fontsize=9, color="#555")
+        ax.text(5.85, y, f"${ask[0]}" if ask[0] else "–", ha="center", fontsize=10.5)
+        ax.text(6.7, y, f"P{ask[1]}" if ask[0] else "", ha="center", fontsize=9, color="#555")
+    ax.text(5, 2.25, f"tick {t + 1} of 240   pot $200   goal: hidden (actually {SYM[g.goal]})",
+            ha="center", fontsize=9, style="italic", color="#335")
 
     # Seats: P0 bottom (the viewpoint), P1 left, P2 top, P3 right.
     pos = {0: (5, 1.05), 1: (1.25, 3.55), 2: (5, 6.05), 3: (8.75, 3.55)}
@@ -101,7 +99,7 @@ def main():
                                     fc="white" if mine else "#f2f2f2", ec="#1f77b4" if mine else "#bbbbbb",
                                     lw=2 if mine else 1))
         name = TABLE[p].split(".")[-1]
-        ax.text(x, y + 0.42, f"P{p} {name}" + ("  (viewpoint)" if mine else ""), ha="center", fontsize=9,
+        ax.text(x, y + 0.42, f"P{p} {name}", ha="center", fontsize=9,
                 weight="bold" if mine else None)
         ax.text(x, y + 0.14, f"cash ${s['cash'][p]}", ha="center", fontsize=8.5, color="#333")
         for su in range(4):
@@ -110,14 +108,21 @@ def main():
         if not mine:
             ax.text(x, y - 0.55, "hand hidden from P0", ha="center", fontsize=7, style="italic", color="#888")
     # P0's belief.
-    ax.text(5, 0.2, "P0's belief from its dealt hand:  " +
-            "   ".join(f"{SYM[su]} {post[su]:.0%}" for su in range(4)), ha="center", fontsize=9, color="#1f77b4")
+    ax.add_patch(FancyBboxPatch((0.05, 0.05), 3.35, 1.65, boxstyle="round,pad=0.04", fc="white", ec="#bbbbbb", lw=1))
+    ax.text(1.725, 1.5, "P0's goal-suit belief (dealt hand)", ha="center", fontsize=9, color="#335", weight="bold")
+    for su in range(4):
+        yy = 1.18 - su * 0.3
+        ax.text(0.25, yy, SYM[su], fontsize=11, color=COL[su], va="center")
+        ax.add_patch(FancyBboxPatch((0.6, yy - 0.08), 2.0 * post[su], 0.16, boxstyle="square,pad=0",
+                                    fc="#1f5fa0", ec="none"))
+        ax.text(0.7 + 2.0 * post[su], yy, f"{post[su]:.0%}", fontsize=8.5, va="center", color="#1f5fa0")
 
     # Recent trades.
-    ax.text(9.95, 1.9, "last trades", ha="right", fontsize=9, color="#335", weight="bold")
+    ax.add_patch(FancyBboxPatch((6.6, 0.05), 3.35, 1.65, boxstyle="round,pad=0.04", fc="white", ec="#bbbbbb", lw=1))
+    ax.text(8.275, 1.5, "last trades (public)", ha="center", fontsize=9, color="#335", weight="bold")
     for k, tr in enumerate(s["trades"][-5:][::-1]):
-        ax.text(9.95, 1.6 - k * 0.27, f"t{tr.tick + 1}  P{tr.buyer} buys {SYM[tr.suit]} from P{tr.seller} ${tr.price}",
-                ha="right", fontsize=8, color=COL[tr.suit])
+        ax.text(6.75, 1.22 - k * 0.26, f"t{tr.tick + 1:<3} P{tr.buyer} buys {SYM[tr.suit]} from P{tr.seller}  ${tr.price}",
+                ha="left", fontsize=8, color=COL[tr.suit], family="DejaVu Sans Mono")
 
     fig.savefig(out, dpi=200, bbox_inches="tight")
     print(out, "game", best, "tick", t + 1, "deck", DECKS[g.deck_id])
