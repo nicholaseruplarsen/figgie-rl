@@ -101,7 +101,7 @@ def main():
                                     fc="white" if mine else "#f2f2f2", ec="#1f77b4" if mine else "#bbbbbb",
                                     lw=2 if mine else 1))
         name = TABLE[p].split(".")[-1]
-        ax.text(x, y + 0.42, f"P{p} {name}" + ("  (viewpoint)" if mine else ""), ha="center", fontsize=9,
+        ax.text(x, y + 0.42, f"P{p} {name}", ha="center", fontsize=9,
                 weight="bold" if mine else None)
         ax.text(x, y + 0.14, f"cash ${s['cash'][p]}", ha="center", fontsize=8.5, color="#333")
         for su in range(4):
