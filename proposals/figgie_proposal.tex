@@ -86,9 +86,14 @@ Train a supervised transformer that reads the public trade history up to tick $t
 Compare its accuracy and log-loss over $t$ with the exact hand-only posterior.
 The gap is an empirical upper bound on what any agent can gain from the order flow, measured separately against each population of opponents.
 
-\paragraph{Extraction.}
-Fit linear and small MLP probes from each learned agent's hidden state to (a)~the exact hand-only posterior and (b)~the true goal suit.
-Train new PPO agents whose observation includes the trade history, comparing a GRU, a transformer, and hand-crafted belief features, and track belief accuracy throughout training.
+\paragraph{Learned belief and mechanistic interpretability.}
+We train PPO agents whose observation includes the trade history, comparing a GRU, a transformer and hand-crafted belief features, and open them up in three steps. Unlike interpretability studies whose targets are human-labelled concepts~\cite{alphazero_probe,othello}, ours has an exact target: the Bayes-optimal goal-suit belief. We can therefore ask not only whether a belief is represented but whether the network computes the right one.
+\begin{enumerate}[leftmargin=*,itemsep=2pt]
+  \item \textbf{Linear probing (what is represented).} Fit linear probes~\cite{probes} from hidden states, at every tick and across training, to the exact hand-only posterior, the true goal suit, and each opponent's holding of each suit. A probe that beats the hand-only posterior on the true goal suit shows the agent has learned to read the order flow. Probes on a randomly initialised network of the same shape control for what the architecture alone makes decodable~\cite{control_tasks}.
+  \item \textbf{Attribution (where the belief comes from).} For the transformer, find attention heads that attend to other players' purchases of a suit (``demand detectors''); for the GRU, attribute the goal-suit probe to individual past trades with gradient$\times$input.
+  \item \textbf{Causal interventions (whether the agent uses it).} \emph{Steering}: add the probe's ``\Club{} is the goal'' direction to the hidden state~\cite{actadd} and test whether the agent starts bidding up \Club. \emph{Activation patching}~\cite{rome}: swap the hidden state between two matched games that differ only in whether an opponent bought \Club, and test whether behaviour follows the patched state. \emph{Ablation}: project the goal-suit direction out of the hidden state and measure the profit lost, a direct estimate of what the learned belief is worth.
+\end{enumerate}
+As a stretch goal, we patch components one at a time in the small transformer to isolate the circuit~\cite{circuits} that carries opponent demand to goal-suit belief to bid.
 
 \paragraph{Leakage.}
 For each agent, train a classifier that predicts that agent's hand composition from its actions alone; its accuracy above the prior is the agent's leakage.
@@ -153,6 +158,11 @@ Final (8 further weeks): history-aware PPO variants, leakage measurement, best-r
 \bibitem{alphazero_probe} T.~McGrath et al. \newblock Acquisition of chess knowledge in AlphaZero. \newblock \emph{PNAS}, 119(47), 2022.
 \bibitem{probes} G.~Alain and Y.~Bengio. \newblock Understanding intermediate layers using linear classifier probes. \newblock arXiv:1610.01644, 2016.
 \bibitem{deepstack} M.~Morav\v{c}\'{i}k et al. \newblock DeepStack: expert-level artificial intelligence in heads-up no-limit poker. \newblock \emph{Science}, 356(6337), 2017.
+\bibitem{othello} K.~Li, A.~K.~Hopkins, D.~Bau, F.~Vi\'egas, H.~Pfister, and M.~Wattenberg. \newblock Emergent world representations: exploring a sequence model trained on a synthetic task. \newblock In \emph{ICLR}, 2023.
+\bibitem{control_tasks} J.~Hewitt and P.~Liang. \newblock Designing and interpreting probes with control tasks. \newblock In \emph{EMNLP}, 2019.
+\bibitem{actadd} A.~M.~Turner et al. \newblock Steering language models with activation engineering. \newblock arXiv:2308.10248, 2023.
+\bibitem{rome} K.~Meng, D.~Bau, A.~Andonian, and Y.~Belinkov. \newblock Locating and editing factual associations in GPT. \newblock In \emph{NeurIPS}, 2022.
+\bibitem{circuits} C.~Olah, N.~Cammarata, L.~Schubert, G.~Goh, M.~Petrov, and S.~Carter. \newblock Zoom in: an introduction to circuits. \newblock \emph{Distill}, 2020.
 \end{thebibliography}
 
 \end{document}
