@@ -10,6 +10,12 @@
 \usepackage{amsmath}
 \usepackage{microtype}
 \usepackage{enumitem}
+\usepackage{pifont}
+\usepackage{xcolor}
+\newcommand{\Spade}{\ding{171}}
+\newcommand{\Club}{\ding{168}}
+\newcommand{\Heart}{\textcolor{red!75!black}{\ding{170}}}
+\newcommand{\Diam}{\textcolor{red!75!black}{\ding{169}}}
 \AtBeginDocument{\newgeometry{textheight=9.4in,textwidth=6.9in,top=0.8in,headheight=12pt,headsep=25pt,footskip=30pt}}
 
 \title{Reading the Order Flow: Information Extraction and Leakage\\in Learned Agents for the Trading Game Figgie}
@@ -18,10 +24,12 @@
   Nicholas Erup Larsen \\
   IIIS, Tsinghua University \\
   \texttt{nglsls26@mails.tsinghua.edu.cn} \\
+  Student ID: 2026400695 \\
   \And
   Adriaan Van der Berg \\
   IIIS, Tsinghua University \\
-  \texttt{\{\}@mails.tsinghua.edu.cn} \\
+  \texttt{adla26@mails.tsinghua.edu.cn} \\
+  Student ID: 2026403362 \\
 }
 
 \begin{document}
@@ -37,24 +45,28 @@
 
 
 \section{Problem and motivation}
-In Figgie, 40 cards are dealt from one of 12 equally likely decks; the goal suit is the same-colour partner of the 12-card suit and pays \$10 per card plus a pot bonus to whoever holds the most.
-Players trade continuously, so a player who eagerly buys a suit is likely to hold, and believe in, that suit.
-Existing agents -- \texttt{figment}'s Bayesian market maker, \texttt{Figgie-bot}'s exact inference, and the \texttt{CS224R PPO} agent~\cite{cs224r} -- compute or approximate the goal-suit posterior given only their own hand.
-We ask three questions:
+In Figgie, 40 custom cards with no numbers or faces are dealt from one of 12 equally likely decks: one suit has 12 cards,
+one has 8 and two have 10. The goal suit is the \textbf{same color \underline{partner}} of the 12-card suit
+(\Spade$\leftrightarrow$\Club, \Heart$\leftrightarrow$\Diam), i.e. if the deck is
+12\,\Spade{} / 10\,\Club{} / 10\,\Heart{} / 8\,\Diam, the goal suit is \Club, and each
+\Club{} pays \$10 plus a pot bonus to whoever holds the most. Players trade continuously,
+so a player who eagerly buys \Club{} is likely to hold many clubs and believe \Club{} is the goal.
+Existing approaches, such as \texttt{figment}'s Bayesian market maker, \texttt{Figgie-bot}'s exact inference, and the \texttt{CS224R PPO} agent~\cite{cs224r}, compute or approximate the goal-suit posterior given only their own hand.
+Instead, we seek to answer three questions:
 \begin{enumerate}
-  \item \textbf{Revelation.} How much does the public trade history reveal about the goal suit beyond a single hand, and how quickly over a 240-tick game?
-  \item \textbf{Extraction.} A PPO agent with memory (a GRU, or a transformer over the trade history) sees every trade as it happens. Nobody tells it to infer the goal suit; it is only rewarded for profit. Does it learn on its own to track that ``P2 keeps buying clubs, so clubs is probably the goal''?
-  \item \textbf{Leakage and exploitability.} How much does each agent's own action stream reveal about its hand, and do the leakiest agents lose the most to a learned best response?
+  \item How much does the public trade history \textbf{reveal} about the goal suit beyond a single hand, and how quickly over a 240-tick game?
+  % \item \textbf{Extraction.} A PPO agent with memory (a GRU, or a transformer over the trade history) sees every trade as it happens. Nobody tells it to infer the goal suit; it is only rewarded for profit. Does it learn on its own to track that ``P2 keeps buying clubs, so clubs is probably the goal''?
+  \item Do agents with memory (GRU, transformer) \textbf{learn to infer} the goal suit despite only receiving rewards for profit?
+  \item How much does each agent's own action stream reveal or \textbf{leak} about its hand, and do the leakiest agents lose the most to a learned best response (exploiter)?
 \end{enumerate}
 
-Elo and profit against a fixed field are the only metrics reported for Figgie agents, and they say nothing about \emph{why} an agent wins or how robust it is.
-Information extraction from order flow and information leakage through one's own quotes are the central concerns of market microstructure; Figgie is a small, fully simulatable market in which both can be measured against exact ground truth (the true deck and every hand).
-The study also exercises the core of the course: recurrent and transformer sequence models, representation learning via probes, and reinforcement learning with self-play.
+Elo and profit against a fixed field are the only metrics reported for Figgie agents, and they say nothing about \textbf{why} an agent wins, or how robust it is.
+Figgie is a clean testbed for a central open question in reinforcement learning under partial observability: does an agent trained only on reward learn to infer hidden state, and to infer it from \emph{other agents' behaviour}? Strong agents for imperfect-information games such as DeepStack~\cite{deepstack} and Pluribus~\cite{pluribus} sidestep the question by computing beliefs explicitly; model-free agents with memory are expected to learn them implicitly, but this is rarely checked, because in poker or StarCraft the exact belief is unknown or intractable. In Figgie it is exact: the 12-deck posterior from any set of cards is a closed-form sum, and the simulator records the true deck and every hand. Figgie also has the multi-agent twist that every action is a signal: an agent that learns to read others' trades should also learn that its own trades are read, and exploitability, the standard robustness measure, has no closed form in a four-player general-sum game. The study exercises the core of the course: recurrent and transformer sequence models, representation learning via probes, and reinforcement learning with self-play.
 
 \section{Data}
 We use no external dataset. All data is generated by simulation in our engine, which implements the standard rules and the CS224R discretisation (240 ticks, 257 actions, prices 1--30).
 We have already replicated four public sources on this engine: the CS224R baselines and PPO pipeline~\cite{cs224r}, figment~\cite{figment}, Figgie-bot~\cite{figgiebot} and figgie-auto~\cite{figgieauto}.
-The figment and Figgie-bot ports reproduce every decision of the original code (144{,}000/144{,}000 and 64{,}000/64{,}000 identical), and our PPO agent matches or exceeds every number in the CS224R report, including a 52\% win rate (54\% reported) against its strongest heuristic table.
+The figment and Figgie-bot ports reproduce every decision of the original code, and our PPO agent matches or exceeds every number in the CS224R report, including a 52\% win rate (54\% reported) against its strongest heuristic table.
 Each training or probing dataset is a set of simulated games with full logs: the deck, all hands, and every quote and trade.
 
 \section{Related work and relevance to the field}
@@ -140,6 +152,7 @@ Final (8 further weeks): history-aware PPO variants, leakage measurement, best-r
 \bibitem{timbers} F.~Timbers et al. \newblock Approximate exploitability: learning a best response. \newblock In \emph{IJCAI}, 2022.
 \bibitem{alphazero_probe} T.~McGrath et al. \newblock Acquisition of chess knowledge in AlphaZero. \newblock \emph{PNAS}, 119(47), 2022.
 \bibitem{probes} G.~Alain and Y.~Bengio. \newblock Understanding intermediate layers using linear classifier probes. \newblock arXiv:1610.01644, 2016.
+\bibitem{deepstack} M.~Morav\v{c}\'{i}k et al. \newblock DeepStack: expert-level artificial intelligence in heads-up no-limit poker. \newblock \emph{Science}, 356(6337), 2017.
 \end{thebibliography}
 
 \end{document}
