@@ -5,6 +5,8 @@
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
 \usepackage{microtype}
 \usepackage{enumitem}
 \AtBeginDocument{\newgeometry{textheight=9.4in,textwidth=6.9in,top=0.8in,headheight=12pt,headsep=25pt,footskip=30pt}}
@@ -23,10 +25,19 @@
 
 \begin{document}
 \maketitle
+\vspace{-1.5em}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{proposal_pipeline.png}
+  \caption{The idea on a real game (TLAW vs BLG, Worlds 2026; BLG won). (a)~A broadcast frame a few seconds before the first teamfight. (b)~The minimap, the only public source of player positions; we detect the ten champions in it every second. (c)~What the official stats feed gives at that same second: team gold, kills, towers and dragons, and per player level, gold, K/D/A and health (plus items, runes, skill order, wards and combat stats), but no positions, summoner-spell cooldowns or vision. (d)~Live win probability from our feed-only model (blue) and the Polymarket price (black). The fight is already visible on the minimap at the frame in (a) (yellow line); the market, whose traders watch the stream, moves then, while the stats-only model moves only once the kills reach the feed (red dashed lines). (e)~A \emph{hypothesis sketch, not data}, of the main result we will measure over $\sim$1{,}000 held-out games: the change in win probability of the scoring side, averaged over all kills and objectives aligned on the time they reach the feed. A feed-only model cannot move before $t=0$; the lead time is how much earlier a model with minimap positions moves.}
+  \label{fig:pipeline}
+\end{figure}
+
+
 
 
 \section{Problem and motivation}
-Given a professional game up to time $t$, predict the probability that the blue team wins.
+Given a professional League of Legends game up to time $t$, predict the probability that the blue team wins.
 We compare a model that sees only the official live-statistics feed with one that also sees the positions of all ten champions, extracted from the minimap in the broadcast video.
 Our hypotheses are that spatial features (1)~reduce log-loss and Brier score, (2)~matter most around contested objectives and in the mid game, and (3)~move the prediction \emph{before} the feed registers the outcome of a fight or objective.
 
