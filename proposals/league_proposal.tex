@@ -1,0 +1,117 @@
+\documentclass{article}
+\usepackage[preprint,nonatbib]{neurips_2019}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{enumitem}
+\geometry{margin=0.8in}
+
+\title{Seeing the Map: Do Broadcast Minimaps Improve\\Live Win Probability in Professional League of Legends?}
+
+\author{%
+  Nicholas Erup Larsen \\
+  Course 80245013, Tsinghua University \\
+  \texttt{nicholaseruplarsen@gmail.com} \\
+  \And
+  Teammate 2 \\
+  \And
+  Teammate 3 \\
+}
+
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+Live win-probability models for professional League of Legends are built on the official statistics feed: gold, kills, objectives and items.
+The feed contains no player positions, yet positioning---who is grouped where, who controls vision around an objective---often decides fights before they show up in the statistics.
+We propose to extract champion positions from broadcast minimaps with a detector trained on synthetic data, and to measure whether, when, and how early spatial features improve live win prediction over a strong feed-only model.
+\end{abstract}
+
+\section{Problem}
+Given a professional game up to time $t$, predict the probability that the blue team wins.
+We compare a model that sees only the official live-statistics feed with one that also sees the positions of all ten champions, extracted from the minimap in the broadcast video.
+Our hypotheses are that spatial features (1)~reduce log-loss and Brier score, (2)~matter most around contested objectives and in the mid game, and (3)~move the prediction \emph{before} the feed registers the outcome of a fight or objective.
+
+\section{Motivation}
+The minimap is the only public source of spatial state in professional games: we verified that the lolesports feed has no coordinates.
+Prior minimap work (DeepLeague~\cite{deepleague}) detected champions but did not use positions for prediction, and its 56-class label set covers a 2017 champion pool.
+The project combines several course topics: convolutional detection, representation learning for spatial state, sequence models (GRU and transformer) over game time, and evaluation of calibrated probabilistic predictions.
+
+\section{Data}
+\paragraph{Sources (all verified).}
+The lolesports esports API maps every game to its official VODs and, for 2026, its timestamp within the broadcast.
+The live-stats feed gives event-driven frames (median spacing 0.13\,s) of team and player statistics and is retrievable back to at least 2023.
+Oracle's Elixir provides post-game outcomes as an independent check.
+Champion icons come from Riot's Data Dragon (173 champions).
+
+\paragraph{Scale.}
+In 2025, about 1{,}370 games from LCK, LEC, LCP, Worlds, MSI and First Stand have both a feed and an official VOD (LPL VODs are not in the API and are excluded); 2023--2025 together give roughly 4{,}000.
+At 2 frames per second this is about 5.8\,M minimap frames for 2025, or about 90\,GB of $190\times190$ crops.
+Videos are downloaded, cropped and deleted, so only crops are stored.
+
+\paragraph{Labels.}
+The feed names the ten champions and their sides, so at inference the detector only distinguishes ten known icons.
+We train it on synthetic minimaps made by pasting team-ringed Data Dragon icons onto real minimap backgrounds with distractors, and evaluate on about 300 hand-labelled real frames.
+Feed frames where a champion is dead give additional free negatives.
+
+\paragraph{Alignment.}
+On a pilot game, OCR of the broadcast clock aligned video to feed within about $\pm0.5$\,s, which is negligible at a 1\,Hz prediction rate.
+
+\section{What we measure}
+\begin{tabular}{@{}p{0.25\textwidth}p{0.70\textwidth}@{}}
+\toprule
+Quantity & Definition \\
+\midrule
+Spatial gain $\Delta\mathcal{L}$ & Log-loss (and Brier score) of the feed-only model minus that of the feed+minimap model on held-out games, with game-level bootstrap CIs; overall and in 5-minute game-time bins. \\
+Calibration & Expected calibration error and reliability curves for both models~\cite{guo}. \\
+Lead time $\tau$ & For each kill, objective or teamfight in the feed, the number of seconds before the event at which each model's probability first moves by more than a threshold in the eventual direction. The difference between models is the minimap's lead. \\
+Event-conditional gain & $\Delta\mathcal{L}$ restricted to the 60\,s before dragon, Baron and Herald contests, compared with quiet periods. \\
+Detector quality & mAP and identity accuracy on 300 hand-labelled frames; position error in map units; fraction of frames with the minimap hidden. \\
+\bottomrule
+\end{tabular}
+
+The central tests are: is $\Delta\mathcal{L}>0$ with a CI excluding zero; is it concentrated before contested objectives; and is $\tau$ positive, i.e.\ does the minimap anticipate what the feed only records afterwards.
+
+\section{Relevance to the field}
+\textbf{Sports analytics.} In traditional sports, adding player-tracking data to box-score statistics changed how value is measured, for example expected possession value in basketball~\cite{epv}. Esports has public tracking-like data only through the broadcast; we test whether the same step pays off.
+
+\textbf{Esports prediction.} Live win prediction in Dota~2~\cite{hodge,yang} and the win-probability graphics shown on League broadcasts rely on aggregate statistics. Whether spatial state adds information is an open question with direct use in broadcasting, coaching and betting markets.
+
+\textbf{Vision under weak supervision.} The detector is trained without manual labels, from synthetic composites and the structured feed (the ten known champions, and death times as negatives). This is a reusable recipe for extracting state from any game broadcast that has a matching data feed.
+
+\section{What is new}
+\begin{itemize}[leftmargin=*,itemsep=2pt]
+  \item DeepLeague~\cite{deepleague} detected champions on minimaps but never used positions for prediction; its labels cover 56 champions from 2017 and its weights are no longer available.
+  \item Published live win-prediction models use statistics only~\cite{hodge,yang}. We give the first controlled measurement of what spatial state adds, aligned to the official feed to within about half a second.
+  \item Lead time is a new evaluation axis for win-probability models: it asks not only whether a model is accurate but whether it knows earlier.
+  \item We build a dataset of about 1{,}400 professional games per year with aligned feed and minimap positions, which does not currently exist publicly.
+\end{itemize}
+
+\section{Baselines}
+\textbf{Feed-only model:} logistic regression on gold difference, gradient-boosted trees on the full feed state, and a GRU over the feed history, the standard form of live win-probability models. \textbf{Betting market:} the live Polymarket price for the same game, reconstructed from public on-chain trades; it is an external baseline reflecting everything traders see, including the broadcast. A pre-game team-strength prior shows how much live data adds at all.
+
+\section{Preliminary approach}
+\begin{enumerate}
+  \item \textbf{Feed-only baselines.} Gradient-boosted trees on the current feed state, and a GRU and a transformer over the feed history, trained on game-level splits with patch-aware held-out sets.
+  \item \textbf{Minimap detection.} A small YOLO-style detector on synthetic data, conditioned on the ten known champions, with tracking across frames.
+  \item \textbf{Spatial features.} Per-team centroid and spread, distance to the next objective, lane presence, and the number of champions near each contested area; and alternatively a learned encoder over a rasterised position map.
+  \item \textbf{Evaluation.} Log-loss, Brier score and reliability curves overall and per game phase; \emph{lead time}, i.e.\ how many seconds earlier the spatial model's probability moves before feed events such as kills and objectives; and ablations by feature group.
+\end{enumerate}
+
+\paragraph{Timeline.}
+Midterm (3 weeks): feed-only baselines on about 1{,}000 games, the synthetic-data detector with its accuracy on real frames, and the pilot alignment.
+Final (8 further weeks): full VOD processing, the combined model, the improvement over the feed-only baseline, lead-time analysis and ablations.
+
+
+\begin{thebibliography}{99}
+\bibitem{deepleague} Farza Majeed (farzaa). \newblock DeepLeague: leveraging computer vision and deep learning on the League of Legends minimap. \newblock \url{https://github.com/farzaa/DeepLeague}, 2018.
+\bibitem{hodge} V.~J.~Hodge, S.~Devlin, N.~Sephton, F.~Block, P.~Cowling, and A.~Drachen. \newblock Win prediction in multiplayer esports: live professional match prediction. \newblock \emph{IEEE Trans.\ Games}, 13(4), 2021.
+\bibitem{yang} Y.~Yang, T.~Qin, and Y.-H.~Lei. \newblock Real-time eSports match result prediction. \newblock arXiv:1701.03162, 2016.
+\bibitem{epv} D.~Cervone, A.~D'Amour, L.~Bornn, and K.~Goldsberry. \newblock A multiresolution stochastic process model for predicting basketball possession outcomes. \newblock \emph{J.\ American Statistical Association}, 111(514), 2016.
+\bibitem{guo} C.~Guo, G.~Pleiss, Y.~Sun, and K.~Q.~Weinberger. \newblock On calibration of modern neural networks. \newblock In \emph{ICML}, 2017.
+\end{thebibliography}
+\end{document}
