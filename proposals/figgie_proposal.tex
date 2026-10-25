@@ -30,33 +30,25 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.62\textwidth]{figgie_snapshot.png}
-  \caption{What a game looks like, at tick 25 of a real game between four replicated agents. Each player sees its own hand (P0, bottom) and its cash, but not the others' hands (greyed). Players post bids and asks on each suit and anyone can trade against the best quote; every trade is announced to all. P0 was dealt eight spades, so its exact posterior puts 83\% on clubs (spades' same-colour partner) being the goal suit, and it has been selling spades and buying clubs, a pattern every other player can read from the trades on the right.}
+  % \caption{What a game looks like, at tick 25 of a real game between four replicated agents. Each player sees its own hand (P0, bottom) and its cash, but not the others' hands (greyed). Players post bids and asks on each suit and anyone can trade against the best quote; every trade is announced to all. P0 was dealt eight spades, so its exact posterior puts 83\% on clubs (spades' same-colour partner) being the goal suit, and it has been selling spades and buying clubs, a pattern every other player can read from the trades on the right.}
   \label{fig:snapshot}
 \end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{figgie_overview.png}
-  \caption{The setting and our first measurement, all on our engine with the replicated agents. (a)~One deal: four hands of ten cards from a 12/10/8/10 deck; the goal suit (hatched) is hidden. (b)~The public order flow of that game: every trade's tick, suit and price is visible to all players, and one player's heavy buying of the goal suit is plain to see. (c)~Mean profit per game in a 26-agent mixed-table tournament of all replicated agents, including our reproduction of the CS224R PPO agent. (d)~Preliminary result over 3{,}000 games: the exact posterior from a player's own dealt hand leaves 1.88 bits of uncertainty about the goal suit; a simple logistic regression that also reads the public trade history reduces this to 1.54 bits by the end of the game (top-1 accuracy 39\%\,$\to$\,54\%). This gap, which no published agent uses, is the information our project is about. (e)~A \emph{hypothesis sketch, not data}, of the relation we will test between how much an agent leaks and how exploitable it is.}
-  \label{fig:overview}
-\end{figure}
-
 
 
 
 \section{Problem and motivation}
 In Figgie, 40 cards are dealt from one of 12 equally likely decks; the goal suit is the same-colour partner of the 12-card suit and pays \$10 per card plus a pot bonus to whoever holds the most.
 Players trade continuously, so a player who eagerly buys a suit is likely to hold, and believe in, that suit.
-Existing agents---figment's Bayesian market maker, Figgie-bot's exact inference, and the CS224R PPO agent~\cite{cs224r}---compute or approximate the goal-suit posterior given only their own hand.
+Existing agents -- \texttt{figment}'s Bayesian market maker, \texttt{Figgie-bot}'s exact inference, and the \texttt{CS224R PPO} agent~\cite{cs224r} -- compute or approximate the goal-suit posterior given only their own hand.
 We ask three questions:
 \begin{enumerate}
   \item \textbf{Revelation.} How much does the public trade history reveal about the goal suit beyond a single hand, and how quickly over a 240-tick game?
-  \item \textbf{Extraction.} Do agents trained with recurrent or attention-based policies learn to use that information, i.e.\ does their internal belief go beyond the exact hand-only posterior?
+  \item \textbf{Extraction.} A PPO agent with memory (a GRU, or a transformer over the trade history) sees every trade as it happens. Nobody tells it to infer the goal suit; it is only rewarded for profit. Does it learn on its own to track that ``P2 keeps buying clubs, so clubs is probably the goal''?
   \item \textbf{Leakage and exploitability.} How much does each agent's own action stream reveal about its hand, and do the leakiest agents lose the most to a learned best response?
 \end{enumerate}
 
 Elo and profit against a fixed field are the only metrics reported for Figgie agents, and they say nothing about \emph{why} an agent wins or how robust it is.
-Information extraction from order flow and information leakage through one's own quotes are the central concerns of market microstructure; Figgie is a small, fully simulable market in which both can be measured against exact ground truth (the true deck and every hand).
+Information extraction from order flow and information leakage through one's own quotes are the central concerns of market microstructure; Figgie is a small, fully simulatable market in which both can be measured against exact ground truth (the true deck and every hand).
 The study also exercises the core of the course: recurrent and transformer sequence models, representation learning via probes, and reinforcement learning with self-play.
 
 \section{Data}
@@ -115,6 +107,14 @@ Strength & Mean profit per game with 95\% CIs, win rate and Elo over rotated mix
 \end{tabular}
 
 The central tests are: does $E_a>0$ for any learned agent; does $E_a$ increase with history-aware architectures (transformer $>$ GRU $>$ none); and is the rank correlation between $L_a$ and $\hat\varepsilon_a$ positive across agents.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figgie_overview.png}
+  \caption{The setting and our first measurement, all on our engine with the replicated agents. (a)~One deal: four hands of ten cards from a 12/10/8/10 deck; the goal suit (hatched) is hidden. (b)~The public order flow of that game: every trade's tick, suit and price is visible to all players, and one player's heavy buying of the goal suit is plain to see. (c)~Mean profit per game in a 26-agent mixed-table tournament of all replicated agents, including our reproduction of the CS224R PPO agent. (d)~Preliminary result over 3{,}000 games: the exact posterior from a player's own dealt hand leaves 1.88 bits of uncertainty about the goal suit; a simple logistic regression that also reads the public trade history reduces this to 1.54 bits by the end of the game (top-1 accuracy 39\%\,$\to$\,54\%). This gap, which no published agent uses, is the information our project is about. (e)~A \emph{hypothesis sketch, not data}, of the relation we will test between how much an agent leaks and how exploitable it is.}
+  \label{fig:overview}
+\end{figure}
+
 
 \subsection{What is new}
 \begin{itemize}[leftmargin=*,itemsep=2pt]
