@@ -29,7 +29,7 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{proposal_pipeline.png}
-  \caption{The idea on a real game (TLAW vs BLG, Worlds 2026). (a)~A broadcast frame a few seconds before the first teamfight. (b)~The minimap, the only public source of player positions; we detect the ten champions in it every second. (c)~Live win probability from our feed-only model (blue) and the Polymarket price (black). The fight is already visible on the minimap at the frame in (a) (yellow line). The market, whose traders watch the stream, moves around then, while the stats-only model moves only once the kills reach the feed (red dashed lines). We test whether adding minimap positions lets a model move earlier too, and by how much (the shaded lead time).}
+  \caption{The idea on a real game (TLAW vs BLG, Worlds 2026; BLG won). (a)~A broadcast frame a few seconds before the first teamfight. (b)~The minimap, the only public source of player positions; we detect the ten champions in it every second. (c)~Live win probability from our feed-only model (blue) and the Polymarket price (black). The fight is already visible on the minimap at the frame in (a) (yellow line); the market, whose traders watch the stream, moves then, while the stats-only model moves only once the kills reach the feed (red dashed lines). (d)~A \emph{hypothesis sketch, not data}, of the main result we will measure over $\sim$1{,}000 held-out games: the change in win probability of the scoring side, averaged over all kills and objectives aligned on the time they reach the feed. A feed-only model cannot move before $t=0$; the lead time is how much earlier a model with minimap positions moves.}
   \label{fig:pipeline}
 \end{figure}
 
