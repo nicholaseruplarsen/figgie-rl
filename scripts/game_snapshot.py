@@ -68,11 +68,9 @@ def main():
     s = snaps[t]
 
     fig, ax = plt.subplots(figsize=(10, 7.2))
-    ax.set_xlim(0, 10); ax.set_ylim(0, 7.2); ax.axis("off")
+    ax.set_xlim(0, 10); ax.set_ylim(0, 6.75); ax.axis("off")
     ax.add_patch(FancyBboxPatch((2.6, 1.9), 4.8, 3.3, boxstyle="round,pad=0.05,rounding_size=0.6",
                                 fc="#e8f1e4", ec="#7a9a6a", lw=1.5))
-    ax.text(5, 7.0, f"Figgie, tick {t + 1} of 240    pot $200    goal suit: hidden (actually {SYM[g.goal]})",
-            ha="center", va="top", fontsize=12, weight="bold")
 
     # Order book in the middle.
     ax.text(5, 4.95, "order book: best quote per suit", ha="center", fontsize=10, color="#335", weight="bold")
@@ -89,8 +87,8 @@ def main():
         ax.text(3.3, y, f"P{bid[1]}" if bid[0] else "", ha="center", fontsize=9, color="#555")
         ax.text(5.85, y, f"${ask[0]}" if ask[0] else "–", ha="center", fontsize=10.5)
         ax.text(6.7, y, f"P{ask[1]}" if ask[0] else "", ha="center", fontsize=9, color="#555")
-    ax.text(5, 2.25, "every trade is public: tick, suit, price, buyer, seller", ha="center",
-            fontsize=8.5, style="italic", color="#335")
+    ax.text(5, 2.25, f"tick {t + 1} of 240   pot $200   goal: hidden (actually {SYM[g.goal]})",
+            ha="center", fontsize=9, style="italic", color="#335")
 
     # Seats: P0 bottom (the viewpoint), P1 left, P2 top, P3 right.
     pos = {0: (5, 1.05), 1: (1.25, 3.55), 2: (5, 6.05), 3: (8.75, 3.55)}

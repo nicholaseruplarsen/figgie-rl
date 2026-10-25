@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage[preprint,nonatbib]{neurips_2019}
+\usepackage[final,nonatbib]{neurips_2019}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{hyperref}
@@ -16,6 +16,7 @@
 \newcommand{\Club}{\ding{168}}
 \newcommand{\Heart}{\textcolor{red!75!black}{\ding{170}}}
 \newcommand{\Diam}{\textcolor{red!75!black}{\ding{169}}}
+\makeatletter\renewcommand{\@notice}{\enlargethispage{2\baselineskip}}\makeatother % no conference footer
 \AtBeginDocument{\newgeometry{textheight=9.4in,textwidth=6.9in,top=0.8in,headheight=12pt,headsep=25pt,footskip=30pt}}
 
 \title{Reading the Order Flow: Information Extraction and Leakage\\in Learned Agents for the Trading Game Figgie}
@@ -34,151 +35,82 @@
 
 \begin{document}
 \maketitle
-\vspace{-1.5em}
+\vspace{-3.5em}
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.62\textwidth]{figgie_snapshot.png}
-  % \caption{What a game looks like, at tick 25 of a real game between four replicated agents. Each player sees its own hand (P0, bottom) and its cash, but not the others' hands (greyed). Players post bids and asks on each suit and anyone can trade against the best quote; every trade is announced to all. P0 was dealt eight spades, so its exact posterior puts 83\% on clubs (spades' same-colour partner) being the goal suit, and it has been selling spades and buying clubs, a pattern every other player can read from the trades on the right.}
-  \label{fig:snapshot}
+  \includegraphics[width=0.6\textwidth]{figgie_snapshot.png}
 \end{figure}
 
 
 
 \section{Problem and motivation}
+In the card game Figgie, you can guess the hidden goal suit by watching who buys what. We measure how much the trades give away, whether reinforcement-learning (RL) agents learn to read them, and whether agents that give away their own hand are easier to beat.
+
 In Figgie, 40 custom cards with no numbers or faces are dealt from one of 12 equally likely decks: one suit has 12 cards,
 one has 8 and two have 10. The goal suit is the \textbf{same color \underline{partner}} of the 12-card suit
-(\Spade$\leftrightarrow$\Club, \Heart$\leftrightarrow$\Diam), i.e. if the deck is
-12\,\Spade{} / 10\,\Club{} / 10\,\Heart{} / 8\,\Diam, the goal suit is \Club, and each
-\Club{} pays \$10 plus a pot bonus to whoever holds the most. Players trade continuously,
-so a player who eagerly buys \Club{} is likely to hold many clubs and believe \Club{} is the goal.
-Existing approaches, such as \texttt{figment}'s Bayesian market maker, \texttt{Figgie-bot}'s exact inference, and the \texttt{CS224R PPO} agent~\cite{cs224r}, compute or approximate the goal-suit posterior given only their own hand.
-Instead, we seek to answer three questions:
+(\Spade$\leftrightarrow$\Club, \Heart$\leftrightarrow$\Diam), e.g.\ if the deck is
+12\,\Spade{} / 10\,\Club{} / 10\,\Heart{} / 8\,\Diam, the goal suit is \Club. Each player pays \$50 into a \$200 pot, and at the end, every \Club{} card pays its holder \$10 from the pot, with the rest (\$100 or \$120) going to whoever holds the most \Club. Players trade continuously by posting prices to buy and sell each suit, and every trade is public. Because goal cards pay out, players pay more for the suit they believe is the goal, so a player who eagerly buys \Club{} is likely to hold many clubs and believe \Club{} is the goal.
+Existing approaches, such as \texttt{figment}'s Bayesian market maker, \texttt{Figgie-bot}'s exact inference, and the \texttt{CS224R PPO} agent~\cite{cs224r}, guess the goal suit from their own cards only and ignore what other players' trades reveal.
+We ask three questions:
 \begin{enumerate}
-  \item How much does the public trade history \textbf{reveal} about the goal suit beyond a single hand, and how quickly over a 240-tick game?
-  % \item \textbf{Extraction.} A PPO agent with memory (a GRU, or a transformer over the trade history) sees every trade as it happens. Nobody tells it to infer the goal suit; it is only rewarded for profit. Does it learn on its own to track that ``P2 keeps buying clubs, so clubs is probably the goal''?
-  \item Do agents with memory (GRU, transformer) \textbf{learn to infer} the goal suit despite only receiving rewards for profit?
-  \item How much does each agent's own action stream reveal or \textbf{leak} about its hand, and do the leakiest agents lose the most to a learned best response (exploiter)?
+  \item How much does the public trade history \textbf{reveal} about the goal suit beyond a single hand, and how quickly?
+  \item Do agents with memory (minGRU, GRU, transformer) \textbf{learn to infer} the goal suit despite only receiving rewards for profit?
+  \item How much does each agent's own action stream reveal or \textbf{leak} about its hand, like a tell in poker, and do the leakiest agents lose the most to a learned best response (exploiter)?
 \end{enumerate}
 
-Elo and profit against a fixed field are the only metrics reported for Figgie agents, and they say nothing about \textbf{why} an agent wins, or how robust it is.
-Figgie is a clean testbed for a central open question in reinforcement learning under partial observability: does an agent trained only on reward learn to infer hidden state, and to infer it from \emph{other agents' behaviour}? Strong agents for imperfect-information games such as DeepStack~\cite{deepstack} and Pluribus~\cite{pluribus} sidestep the question by computing beliefs explicitly; model-free agents with memory are expected to learn them implicitly, but this is rarely checked, because in poker or StarCraft the exact belief is unknown or intractable. In Figgie it is exact: the 12-deck posterior from any set of cards is a closed-form sum, and the simulator records the true deck and every hand. Figgie also has the multi-agent twist that every action is a signal: an agent that learns to read others' trades should also learn that its own trades are read, and exploitability, the standard robustness measure, has no closed form in a four-player general-sum game. The study exercises the core of the course: recurrent and transformer sequence models, representation learning via probes, and reinforcement learning with self-play.
+Elo and profit against a fixed field, the only metrics reported for Figgie agents, say nothing about \textbf{why} an agent wins or how robust it is.
+Figgie is also a clean testbed for an open question in reinforcement learning under partial observability: does an agent trained only on reward learn to infer hidden state from \emph{other agents' behaviour}? DeepStack and Pluribus~\cite{pluribus} sidestep this by computing beliefs explicitly, while model-free agents with memory are expected to learn them implicitly, but this is rarely checked because in poker or StarCraft the exact belief is intractable. Unlike poker, where hidden information leaks through a few bets in a zero-sum game, Figgie is general-sum (a trade can help both sides) and players reveal information through dozens of priced trades, while the hidden state is tiny (12 possible decks, so the exact belief is easy to compute), isolating the skill of reading other agents. 
 
 \section{Data}
-We use no external dataset: all data is generated by simulating Figgie in our own engine, so the amount is limited only by compute. The engine implements the standard rules and the CS224R action space~\cite{cs224r}, and runs four public agent families~\cite{figment,figgiebot,figgieauto} whose decisions match their original code.
+We use no external dataset: all data is simulated in our engine, which implements the standard rules and the CS224R action space~\cite{cs224r} and runs the public agents from two open-source projects~\cite{figment,figgiebot} and the CS224R report, of which the figment and Figgie-bot agents match their original code decision for decision. The simulator logs the true deck and all hands, so each sample carries exact ground truth.
 
+\begin{center}
 \begin{tabular}{@{}lr@{}}
 \toprule
-Quantity & Value \\
-\midrule
 One game & 240 ticks $\times$ 4 players $=$ 960 decisions \\
-Observation per decision & 69 \texttt{float32} $=$ 276\,B \\
-Training sample (obs., action, reward, value, log-prob, done) & $\approx$\,300\,B \\
-Full game log (deal, every quote and trade) & $\approx$\,10\,KB \\
-\midrule
-Simulator, measured (1 CPU core, pure Python) & 11\,ms/game $=$ 85{,}000 decisions/s \\
-PPO training, measured (current pipeline) & 3{,}800 learner steps/s $\approx$ 1.1\,MB/s \\
-Longest run so far & 33\,M learner steps $\approx$ 10\,GB in 2.4\,h \\
-\midrule
-Projected: vectorised engine on a 32-core RTX~5090 server & $\sim$1\,M steps/s $\approx$ 0.3\,GB/s $\approx$ 1\,TB/h \\
+Observation / training sample & 69 \texttt{float32} $=$ 276\,B / $\approx$\,300\,B \\
+Simulator, measured (1 CPU core) & 11\,ms/game $=$ 85{,}000 decisions/s \\
+PPO training, measured & 3{,}800 steps/s $\approx$ 1.1\,MB/s, longest run 33\,M steps $\approx$ 10\,GB \\
+Projected, vectorised engine on an RTX~5090 server & $\sim$1\,M steps/s $\approx$ 0.3\,GB/s $\approx$ 1\,TB/h \\
 \bottomrule
 \end{tabular}
+\end{center}
 
-The current bottleneck is the Python simulator and opponents, not the network: a GRU-128 policy is tiny for any modern GPU. Porting the engine to C or batched GPU code, as we did for smaller imperfect-information games in prior work (about $150\times$ per GPU over one CPU core), is what moves throughput from the measured to the projected row. Because every game is logged with the true deck and all hands, each sample comes with exact ground truth for the belief and leakage measurements at no extra cost.
-
-\section{Related work and relevance to the field}
-\textbf{Market microstructure.} Kyle~\cite{kyle} and Glosten--Milgrom~\cite{glosten} model how informed traders' orders reveal private information and how market makers protect themselves against it. Those models assume rational agents with known strategies. We measure revelation and leakage for learned and heuristic agents in a market where ground truth is exact, which is impossible on real exchanges.
-
-\textbf{Multi-agent learning.} Exploitability is the standard robustness measure in two-player zero-sum games, but it has no closed form in multi-player general-sum games such as Figgie or six-player poker~\cite{pluribus}. Learned best responses~\cite{timbers} are the practical substitute; we pair them with an explanation of \emph{why} an agent is exploitable.
-
-\textbf{Interpretability of RL agents.} Probing has shown that AlphaZero encodes human chess concepts~\cite{alphazero_probe}, using linear probes~\cite{probes}. Figgie offers an exact Bayesian target for the probe, so we can say not only whether a belief is encoded but how close it is to optimal.
+\section{Related work}
+Prior Figgie agents (hand-written, Bayesian and evolutionary bots~\cite{figment,figgiebot} and one PPO agent~\cite{cs224r}) are ranked only by profit or Elo, and none is measured for what the order flow reveals or what it leaks.
+In market microstructure, Kyle~\cite{kyle} and Glosten--Milgrom model how informed orders reveal private information, assuming rational agents, whereas we measure it for learned agents against exact ground truth.
+In multi-agent RL, exploitability has no closed form in multi-player general-sum games~\cite{pluribus}, so learned best responses~\cite{timbers} are the practical substitute, and no estimate exists for any Figgie agent.
+In interpretability, probing has shown that AlphaZero encodes human chess concepts~\cite{alphazero_probe}, whereas Figgie gives an exact Bayes-optimal target, so we can investigate whether the network computes the \emph{right} belief.
 
 \section{Preliminary approach}
-\subsection{Baselines}
-\textbf{Belief:} the exact hand-only Bayesian posterior over the 12 decks, which every published agent approximates. \textbf{Agents:} the CS224R PPO agent and the Bayesian market makers from figment and Figgie-bot, all replicated and verified on our engine; these are the reference points for strength, leakage and exploitability.
+Baselines are the 1. \emph{hand-only posterior}, the exact best guess from a player's own cards (for belief), and 2. replicated agents.
 
-\subsection{Method}
-\paragraph{Revelation bound.}
-Train a supervised transformer that reads the public trade history up to tick $t$ and predicts the goal suit.
-Compare its accuracy and log-loss over $t$ with the exact hand-only posterior.
-The gap is an empirical upper bound on what any agent can gain from the order flow, measured separately against each population of opponents.
+For question 1, we propose to train a supervised transformer that reads a player's hand plus the public trade history up to tick $t$ and predicts the goal suit. Its gain over the hand-only posterior, $\Delta_{\text{rev}}(t)$, measured in bits of uncertainty about the goal suit (2 bits means no idea, 0 means certain), estimates how much the order flow reveals.
 
-\paragraph{Learned belief and mechanistic interpretability.}
-We train PPO agents whose observation includes the trade history, comparing a GRU, a transformer and hand-crafted belief features, and open them up in three steps. Unlike interpretability studies whose targets are human-labelled concepts~\cite{alphazero_probe,othello}, ours has an exact target: the Bayes-optimal goal-suit belief. We can therefore ask not only whether a belief is represented but whether the network computes the right one.
-\begin{enumerate}[leftmargin=*,itemsep=2pt]
-  \item \textbf{Linear probing (what is represented).} Fit linear probes~\cite{probes} from hidden states, at every tick and across training, to the exact hand-only posterior, the true goal suit, and each opponent's holding of each suit. A probe that beats the hand-only posterior on the true goal suit shows the agent has learned to read the order flow. Probes on a randomly initialised network of the same shape control for what the architecture alone makes decodable~\cite{control_tasks}.
-  \item \textbf{Attribution (where the belief comes from).} For the transformer, find attention heads that attend to other players' purchases of a suit (``demand detectors''); for the GRU, attribute the goal-suit probe to individual past trades with gradient$\times$input.
-  \item \textbf{Causal interventions (whether the agent uses it).} \emph{Steering}: add the probe's ``\Club{} is the goal'' direction to the hidden state~\cite{actadd} and test whether the agent starts bidding up \Club. \emph{Activation patching}~\cite{rome}: swap the hidden state between two matched games that differ only in whether an opponent bought \Club, and test whether behaviour follows the patched state. \emph{Ablation}: project the goal-suit direction out of the hidden state and measure the profit lost, a direct estimate of what the learned belief is worth.
-\end{enumerate}
-As a stretch goal, we patch components one at a time in the small transformer to isolate the circuit~\cite{circuits} that carries opponent demand to goal-suit belief to bid.
+For question 2, we seek to train PPO agents with a minGRU, GRU or transformer over the trade history and open them up with mechanistic interpretability:
+(i)~\emph{linear probing}~\cite{probes}, asking whether we can read the agent's belief out of its memory: we decode the true goal suit and opponents' holdings from hidden states at every tick, and score extraction $E_a$ from 0 (it knows only what its cards say) to 1 (it reads the trades as well as our best model),
+(ii)~\emph{attribution}, asking which past trades it pays attention to: we find attention heads that track opponents' purchases of a suit, or attribute the GRU's belief to past trades, and
+(iii)~\emph{causal interventions}, asking whether changing its belief changes its trading: we steer the hidden state along the ``\Club{} is the goal'' direction~\cite{actadd}, patch activations between matched games~\cite{rome}, and ablate the direction to measure the profit it is worth.
 
-\paragraph{Leakage.}
-For each agent, train a classifier that predicts that agent's hand composition from its actions alone; its accuracy above the prior is the agent's leakage.
+For question 3, leakage $L_a$ is how well a classifier predicts agent $a$'s hand from its actions, in bits over the prior. Exploitability $\hat\varepsilon_a$ is the profit of a PPO best response against three copies of $a$, minus a no-information control.
 
-\paragraph{Exploitability.}
-For each agent, train a PPO best response at one seat with the other seats fixed, and estimate exploitability as the best response's profit gain over a no-information control.
-We decompose the gain into an information term (earlier correct goal-suit belief) and a pricing term, and test whether leakage predicts exploitability across agents.
-If time allows, we validate the estimator on small games where exact exploitability is computable (Kuhn and Leduc poker).
+The central tests are simple: do RL agents learn to read trades ($E_a>0$), does better memory help (no memory $<$ minGRU $<$ GRU $<$ transformer), and do agents that give away more lose more (positive rank correlation between $L_a$ and $\hat\varepsilon_a$)?
 
-\paragraph{Expected results.}
-(i)~Goal-suit accuracy versus tick for hand-only, order-flow and probed agent beliefs;
-(ii)~a table of Elo, profit, leakage and estimated exploitability for every agent;
-(iii)~whether learned memory architectures close the gap to the revelation bound.
+By the midterm (3 weeks) we aim to have the revelation bound and first probes of PPO, and by the final report (8 further weeks), the history-aware agents, interventions, leakage and exploitability.
 
-
-
-\subsection{What we measure}
-\begin{tabular}{@{}p{0.25\textwidth}p{0.70\textwidth}@{}}
-\toprule
-Quantity & Definition \\
-\midrule
-Revelation gap $\Delta_{\text{rev}}(t)$ & Log-loss of the exact hand-only goal-suit posterior minus log-loss of the best predictor that also sees the public trade history up to tick $t$, in bits; reported for each opponent population. \\
-Belief extraction $E_a(t)$ & Log-loss of a probe on agent $a$'s hidden state for the true goal suit, placed between the hand-only posterior ($E=0$) and the revelation bound ($E=1$). \\
-Leakage $L_a$ & Mutual information, in bits, between agent $a$'s hand composition and its action stream, lower-bounded by the cross-entropy gain of a trained classifier over the prior. \\
-Exploitability $\hat\varepsilon_a$ & Profit per game of a learned best response at one seat against three copies of $a$, minus that of a no-information control. Decomposed into an information term and a pricing term. \\
-Strength & Mean profit per game with 95\% CIs, win rate and Elo over rotated mixed tables (already measured in the replication). \\
-\bottomrule
-\end{tabular}
-
-The central tests are: does $E_a>0$ for any learned agent; does $E_a$ increase with history-aware architectures (transformer $>$ GRU $>$ none); and is the rank correlation between $L_a$ and $\hat\varepsilon_a$ positive across agents.
-
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=\textwidth]{figgie_overview.png}
-%   \caption{The setting and our first measurement, all on our engine with the replicated agents. (a)~One deal: four hands of ten cards from a 12/10/8/10 deck; the goal suit (hatched) is hidden. (b)~The public order flow of that game: every trade's tick, suit and price is visible to all players, and one player's heavy buying of the goal suit is plain to see. (c)~Mean profit per game in a 26-agent mixed-table tournament of all replicated agents, including our reproduction of the CS224R PPO agent. (d)~Preliminary result over 3{,}000 games: the exact posterior from a player's own dealt hand leaves 1.88 bits of uncertainty about the goal suit; a simple logistic regression that also reads the public trade history reduces this to 1.54 bits by the end of the game (top-1 accuracy 39\%\,$\to$\,54\%). This gap, which no published agent uses, is the information our project is about. (e)~A \emph{hypothesis sketch, not data}, of the relation we will test between how much an agent leaks and how exploitable it is.}
-%   \label{fig:overview}
-% \end{figure}
-
-
-\subsection{What is new}
-\begin{itemize}[leftmargin=*,itemsep=2pt]
-  \item Prior Figgie work ranks agents only by profit or Elo against a fixed field: hand-written strategies in a discrete-event simulation~\cite{strange}, Bayesian and evolutionary bots~\cite{figment,figgiebot}, and one PPO agent~\cite{cs224r}. None measures what the order flow reveals or what an agent leaks.
-  \item No published Figgie agent conditions its belief on opponents' trades; all use the player's own hand. We test whether learning closes that gap.
-  \item No exploitability estimate exists for any Figgie agent, and none for a multi-player trading game that we are aware of.
-  \item We release a single engine with four replicated sources whose decisions are verified against the original code, so future work can compare against the same agents.
-\end{itemize}
-
-\paragraph{Timeline.}
-Midterm (3 weeks): replication results, revelation bound, first probe of PPO.
-Final (8 further weeks): history-aware PPO variants, leakage measurement, best-response exploitability and the leakage--exploitability analysis.
-
-\begin{thebibliography}{99}
-\bibitem{cs224r} D.~Li Yang. \newblock Reinforcement learning for Figgie: learning negotiation as a first-class skill. \newblock Stanford CS224R project report, 2026.
+{\footnotesize
+\begin{thebibliography}{99}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
 \bibitem{figment} mneha05. \newblock figment: a self-play market-making arena for Figgie-style card markets. \newblock \url{https://github.com/mneha05/figment}.
 \bibitem{figgiebot} revilo-25. \newblock Figgie-bot. \newblock \url{https://github.com/revilo-25/Figgie-bot}.
-\bibitem{figgieauto} 0xDub. \newblock figgie-auto. \newblock \url{https://github.com/0xDub/figgie-auto}.
-\bibitem{strange} C.~DiSilvio, A.~Luo, and A.~Ozerov. \newblock Traders in a strange land: agent-based discrete-event market simulation of the Figgie card game. \newblock arXiv:2110.00879, 2021.
+\bibitem{cs224r} D.~Li Yang. \newblock Reinforcement learning for Figgie: learning negotiation as a first-class skill. \newblock Stanford CS224R project report, 2026.
 \bibitem{kyle} A.~S.~Kyle. \newblock Continuous auctions and insider trading. \newblock \emph{Econometrica}, 53(6), 1985.
-\bibitem{glosten} L.~R.~Glosten and P.~R.~Milgrom. \newblock Bid, ask and transaction prices in a specialist market with heterogeneously informed traders. \newblock \emph{J.\ Financial Economics}, 14(1), 1985.
 \bibitem{pluribus} N.~Brown and T.~Sandholm. \newblock Superhuman AI for multiplayer poker. \newblock \emph{Science}, 365(6456), 2019.
 \bibitem{timbers} F.~Timbers et al. \newblock Approximate exploitability: learning a best response. \newblock In \emph{IJCAI}, 2022.
 \bibitem{alphazero_probe} T.~McGrath et al. \newblock Acquisition of chess knowledge in AlphaZero. \newblock \emph{PNAS}, 119(47), 2022.
+\bibitem{rome} K.~Meng et al. \newblock Locating and editing factual associations in GPT. \newblock In \emph{NeurIPS}, 2022.
 \bibitem{probes} G.~Alain and Y.~Bengio. \newblock Understanding intermediate layers using linear classifier probes. \newblock arXiv:1610.01644, 2016.
-\bibitem{deepstack} M.~Morav\v{c}\'{i}k et al. \newblock DeepStack: expert-level artificial intelligence in heads-up no-limit poker. \newblock \emph{Science}, 356(6337), 2017.
-\bibitem{othello} K.~Li, A.~K.~Hopkins, D.~Bau, F.~Vi\'egas, H.~Pfister, and M.~Wattenberg. \newblock Emergent world representations: exploring a sequence model trained on a synthetic task. \newblock In \emph{ICLR}, 2023.
-\bibitem{control_tasks} J.~Hewitt and P.~Liang. \newblock Designing and interpreting probes with control tasks. \newblock In \emph{EMNLP}, 2019.
 \bibitem{actadd} A.~M.~Turner et al. \newblock Steering language models with activation engineering. \newblock arXiv:2308.10248, 2023.
-\bibitem{rome} K.~Meng, D.~Bau, A.~Andonian, and Y.~Belinkov. \newblock Locating and editing factual associations in GPT. \newblock In \emph{NeurIPS}, 2022.
-\bibitem{circuits} C.~Olah, N.~Cammarata, L.~Schubert, G.~Goh, M.~Petrov, and S.~Carter. \newblock Zoom in: an introduction to circuits. \newblock \emph{Distill}, 2020.
 \end{thebibliography}
+}
 
 \end{document}
