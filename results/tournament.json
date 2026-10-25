@@ -1,0 +1,307 @@
+{
+ "args": {
+  "tables": 4000,
+  "procs": 11,
+  "seed": 12345,
+  "ppo": [
+   "PPO-v1=runs/ppo_v1/final.pt",
+   "PPO-v2=runs/ppo_v2/final.pt",
+   "PPO-v2-long=runs/ppo_v2_long/final.pt",
+   "PPO-noBC=runs/ppo_scratch/final.pt"
+  ],
+  "exclude": [],
+  "out": "results/tournament"
+ },
+ "rows": [
+  {
+   "agent": "fig.BayesianMM",
+   "games": 2148,
+   "mean_pnl": 52.08,
+   "ci95": 6.14,
+   "win_rate": 0.391,
+   "elo": 1642,
+   "trueskill": 25.11,
+   "lifts_per_game": 4.58
+  },
+  {
+   "agent": "fig.AdaptiveMM",
+   "games": 2112,
+   "mean_pnl": 49.49,
+   "ci95": 5.81,
+   "win_rate": 0.398,
+   "elo": 1651,
+   "trueskill": 25.88,
+   "lifts_per_game": 6.62
+  },
+  {
+   "agent": "fig.Fundamental",
+   "games": 2244,
+   "mean_pnl": 42.4,
+   "ci95": 4.7,
+   "win_rate": 0.385,
+   "elo": 1632,
+   "trueskill": 25.54,
+   "lifts_per_game": 1.9
+  },
+  {
+   "agent": "PPO-v2",
+   "games": 2128,
+   "mean_pnl": 32.25,
+   "ci95": 3.95,
+   "win_rate": 0.475,
+   "elo": 1598,
+   "trueskill": 24.61,
+   "lifts_per_game": 5.96
+  },
+  {
+   "agent": "fb.ConstVal",
+   "games": 2032,
+   "mean_pnl": 31.76,
+   "ci95": 6.81,
+   "win_rate": 0.463,
+   "elo": 1572,
+   "trueskill": 23.21,
+   "lifts_per_game": 4.25
+  },
+  {
+   "agent": "Bayesian",
+   "games": 2284,
+   "mean_pnl": 30.06,
+   "ci95": 3.38,
+   "win_rate": 0.417,
+   "elo": 1597,
+   "trueskill": 24.3,
+   "lifts_per_game": 3.3
+  },
+  {
+   "agent": "PPO-v2-long",
+   "games": 2248,
+   "mean_pnl": 30.02,
+   "ci95": 4.13,
+   "win_rate": 0.456,
+   "elo": 1602,
+   "trueskill": 24.18,
+   "lifts_per_game": 5.21
+  },
+  {
+   "agent": "fa.PickOff",
+   "games": 2192,
+   "mean_pnl": 29.66,
+   "ci95": 5.14,
+   "win_rate": 0.237,
+   "elo": 1559,
+   "trueskill": 24.21,
+   "lifts_per_game": 3.08
+  },
+  {
+   "agent": "fb.FixedSpread",
+   "games": 2324,
+   "mean_pnl": 24.99,
+   "ci95": 3.28,
+   "win_rate": 0.253,
+   "elo": 1572,
+   "trueskill": 24.62,
+   "lifts_per_game": 0.5
+  },
+  {
+   "agent": "fb.PotMM",
+   "games": 2260,
+   "mean_pnl": 21.76,
+   "ci95": 3.4,
+   "win_rate": 0.416,
+   "elo": 1567,
+   "trueskill": 25.19,
+   "lifts_per_game": 2.27
+  },
+  {
+   "agent": "fb.FlowMM",
+   "games": 2124,
+   "mean_pnl": 20.0,
+   "ci95": 3.45,
+   "win_rate": 0.409,
+   "elo": 1565,
+   "trueskill": 23.68,
+   "lifts_per_game": 2.32
+  },
+  {
+   "agent": "fa.TiltInventory",
+   "games": 2108,
+   "mean_pnl": 14.55,
+   "ci95": 2.69,
+   "win_rate": 0.235,
+   "elo": 1530,
+   "trueskill": 23.1,
+   "lifts_per_game": 1.01
+  },
+  {
+   "agent": "FairValue",
+   "games": 2160,
+   "mean_pnl": 13.69,
+   "ci95": 2.16,
+   "win_rate": 0.15,
+   "elo": 1549,
+   "trueskill": 23.69,
+   "lifts_per_game": 0.2
+  },
+  {
+   "agent": "PPO-v1",
+   "games": 2120,
+   "mean_pnl": 13.13,
+   "ci95": 2.56,
+   "win_rate": 0.244,
+   "elo": 1515,
+   "trueskill": 22.65,
+   "lifts_per_game": 0.57
+  },
+  {
+   "agent": "fb.HandMM",
+   "games": 2404,
+   "mean_pnl": 10.59,
+   "ci95": 2.19,
+   "win_rate": 0.126,
+   "elo": 1556,
+   "trueskill": 23.75,
+   "lifts_per_game": 0.85
+  },
+  {
+   "agent": "fa.TheHoarder",
+   "games": 2164,
+   "mean_pnl": 10.17,
+   "ci95": 2.29,
+   "win_rate": 0.364,
+   "elo": 1555,
+   "trueskill": 24.19,
+   "lifts_per_game": 3.87
+  },
+  {
+   "agent": "fa.Seller",
+   "games": 2272,
+   "mean_pnl": 9.72,
+   "ci95": 1.75,
+   "win_rate": 0.114,
+   "elo": 1560,
+   "trueskill": 23.92,
+   "lifts_per_game": 0.0
+  },
+  {
+   "agent": "PPO-noBC",
+   "games": 2280,
+   "mean_pnl": 4.98,
+   "ci95": 2.71,
+   "win_rate": 0.185,
+   "elo": 1468,
+   "trueskill": 22.84,
+   "lifts_per_game": 0.29
+  },
+  {
+   "agent": "fa.Spread",
+   "games": 2204,
+   "mean_pnl": 4.12,
+   "ci95": 2.7,
+   "win_rate": 0.203,
+   "elo": 1546,
+   "trueskill": 22.83,
+   "lifts_per_game": 3.41
+  },
+  {
+   "agent": "MarketMaker",
+   "games": 2212,
+   "mean_pnl": 1.03,
+   "ci95": 1.57,
+   "win_rate": 0.114,
+   "elo": 1513,
+   "trueskill": 22.54,
+   "lifts_per_game": 0.0
+  },
+  {
+   "agent": "fa.PrayingMantis",
+   "games": 2292,
+   "mean_pnl": 0.74,
+   "ci95": 1.8,
+   "win_rate": 0.166,
+   "elo": 1474,
+   "trueskill": 22.39,
+   "lifts_per_game": 1.26
+  },
+  {
+   "agent": "Conservative",
+   "games": 2248,
+   "mean_pnl": -4.7,
+   "ci95": 1.42,
+   "win_rate": 0.149,
+   "elo": 1478,
+   "trueskill": 22.47,
+   "lifts_per_game": 0.02
+  },
+  {
+   "agent": "fa.Noisy",
+   "games": 2248,
+   "mean_pnl": -11.63,
+   "ci95": 2.15,
+   "win_rate": 0.138,
+   "elo": 1402,
+   "trueskill": 21.32,
+   "lifts_per_game": 3.3
+  },
+  {
+   "agent": "fb.Random",
+   "games": 2220,
+   "mean_pnl": -27.36,
+   "ci95": 3.55,
+   "win_rate": 0.187,
+   "elo": 1437,
+   "trueskill": 19.83,
+   "lifts_per_game": 8.79
+  },
+  {
+   "agent": "fig.Momentum",
+   "games": 2300,
+   "mean_pnl": -39.08,
+   "ci95": 3.93,
+   "win_rate": 0.202,
+   "elo": 1375,
+   "trueskill": 19.42,
+   "lifts_per_game": 3.9
+  },
+  {
+   "agent": "fb.PotValShuffled",
+   "games": 2236,
+   "mean_pnl": -41.67,
+   "ci95": 4.3,
+   "win_rate": 0.151,
+   "elo": 1402,
+   "trueskill": 20.76,
+   "lifts_per_game": 5.24
+  },
+  {
+   "agent": "fb.Momentum",
+   "games": 1980,
+   "mean_pnl": -44.88,
+   "ci95": 4.3,
+   "win_rate": 0.173,
+   "elo": 1343,
+   "trueskill": 18.48,
+   "lifts_per_game": 10.96
+  },
+  {
+   "agent": "fig.Random",
+   "games": 2212,
+   "mean_pnl": -73.67,
+   "ci95": 5.28,
+   "win_rate": 0.085,
+   "elo": 1266,
+   "trueskill": 17.36,
+   "lifts_per_game": 13.73
+  },
+  {
+   "agent": "Random",
+   "games": 2244,
+   "mean_pnl": -198.48,
+   "ci95": 6.45,
+   "win_rate": 0.012,
+   "elo": 978,
+   "trueskill": 12.86,
+   "lifts_per_game": 20.0
+  }
+ ]
+}

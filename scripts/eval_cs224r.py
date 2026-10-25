@@ -60,7 +60,7 @@ def run(job):
     nw = sum(p == top for p in r.profits)
     res = {}
     for i, n in enumerate(seated):
-        key = f"{n}@{(i - rot) % len(names)}"
+        key = f"{n}@{(i + rot) % len(names)}"
         res[key] = (r.profits[i], (r.profits[i] == top) / nw, r.stats[i]["lifts"],
                     r.stats[i]["filled"] / max(r.stats[i]["quotes"], 1))
     return res
