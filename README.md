@@ -11,7 +11,7 @@ and a mixed-table tournament (P&L with CIs, Elo, TrueSkill).
 | [revilo-25/Figgie-bot](https://github.com/revilo-25/Figgie-bot) | PotMM, HandMM, FlowMM, FixedSpread, Momentum, controls | decisions identical to original |
 | [0xDub/figgie-auto](https://github.com/0xDub/figgie-auto) | Tilt, Spread, Seller, Noisy, PickOff, Hoarder, Mantis | reimplemented, code review only |
 
-Work in progress: PPO training and the full tournament are running; results will go in `RESULTS.md`.
+Results: see [RESULTS.md](RESULTS.md).
 See `DESIGN.md` for rules, every guessed detail, and provenance.
 
 ```bash
