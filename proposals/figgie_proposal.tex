@@ -5,6 +5,8 @@
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{microtype}
 \usepackage{enumitem}
@@ -24,6 +26,15 @@
 
 \begin{document}
 \maketitle
+\vspace{-1.5em}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figgie_overview.png}
+  \caption{The setting and our first measurement, all on our engine with the replicated agents. (a)~One deal: four hands of ten cards from a 12/10/8/10 deck; the goal suit (hatched) is hidden. (b)~The public order flow of that game: every trade's tick, suit and price is visible to all players, and one player's heavy buying of the goal suit is plain to see. (c)~Mean profit per game in a 26-agent mixed-table tournament of all replicated agents, including our reproduction of the CS224R PPO agent. (d)~Preliminary result over 3{,}000 games: the exact posterior from a player's own dealt hand leaves 1.88 bits of uncertainty about the goal suit; a simple logistic regression that also reads the public trade history reduces this to 1.54 bits by the end of the game (top-1 accuracy 39\%\,$\to$\,54\%). This gap, which no published agent uses, is the information our project is about. (e)~A \emph{hypothesis sketch, not data}, of the relation we will test between how much an agent leaks and how exploitable it is.}
+  \label{fig:overview}
+\end{figure}
+
+
 
 
 \section{Problem and motivation}
