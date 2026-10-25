@@ -7,7 +7,7 @@
 \usepackage{booktabs}
 \usepackage{microtype}
 \usepackage{enumitem}
-\geometry{margin=0.8in}
+\AtBeginDocument{\newgeometry{textheight=9.4in,textwidth=6.9in,top=0.8in,headheight=12pt,headsep=25pt,footskip=30pt}}
 
 \title{Seeing the Map: Do Broadcast Minimaps Improve\\Live Win Probability in Professional League of Legends?}
 
@@ -17,19 +17,11 @@
   \texttt{nicholaseruplarsen@gmail.com} \\
   \And
   Teammate 2 \\
-  \And
-  Teammate 3 \\
 }
 
 \begin{document}
 \maketitle
 
-
-\begin{abstract}
-Live win-probability models for professional League of Legends are built on the official statistics feed: gold, kills, objectives and items.
-The feed contains no player positions, yet positioning---who is grouped where, who controls vision around an objective---often decides fights before they show up in the statistics.
-We propose to extract champion positions from broadcast minimaps with a detector trained on synthetic data, and to measure whether, when, and how early spatial features improve live win prediction over a strong feed-only model.
-\end{abstract}
 
 \section{Problem and motivation}
 Given a professional game up to time $t$, predict the probability that the blue team wins.
