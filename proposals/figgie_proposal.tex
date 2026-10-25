@@ -8,7 +8,7 @@
 \usepackage{amsmath}
 \usepackage{microtype}
 \usepackage{enumitem}
-\geometry{margin=0.8in}
+\AtBeginDocument{\newgeometry{textheight=9.4in,textwidth=6.9in,top=0.8in,headheight=12pt,headsep=25pt,footskip=30pt}}
 
 \title{Reading the Order Flow: Information Extraction and Leakage\\in Learned Agents for the Trading Game Figgie}
 
@@ -18,19 +18,11 @@
   \texttt{nicholaseruplarsen@gmail.com} \\
   \And
   Teammate 2 \\
-  \And
-  Teammate 3 \\
 }
 
 \begin{document}
 \maketitle
 
-
-\begin{abstract}
-Figgie is a four-player card trading game in which the scoring (``goal'') suit is hidden and must be inferred.
-All published Figgie agents, including the only reinforcement-learning attempt, infer the goal suit from the player's own hand alone, yet every trade made by an opponent also carries information about what that opponent holds.
-We propose to measure how much information the public order flow reveals, whether learned agents extract it, whether they leak their own private information through their actions, and whether leakage explains exploitability.
-\end{abstract}
 
 \section{Problem and motivation}
 In Figgie, 40 cards are dealt from one of 12 equally likely decks; the goal suit is the same-colour partner of the 12-card suit and pays \$10 per card plus a pot bonus to whoever holds the most.
