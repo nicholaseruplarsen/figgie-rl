@@ -16,7 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-ORDER = [("transformer", 0), ("gru", 0), ("none", 0), ("mingru", 0),
+ORDER = [("gru", 0), ("none", 0), ("mingru", 0), ("transformer", 0),
          ("gru", 1), ("none", 1), ("mingru", 1), ("transformer", 1),
          ("gru", 2), ("none", 2), ("mingru", 2), ("transformer", 2)]
 MINE = ("figgie.rl.train", "probe_ppo.py", "memory_queue.py")
