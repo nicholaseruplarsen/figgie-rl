@@ -66,14 +66,14 @@ The simulator logs the deck and all hands, so every sample carries exact ground 
 One game takes about 11\,ms on one CPU core (85{,}000 decisions/s).
 We ported 25 agents from four public sources: the CS224R report~\cite{cs224r} (5 baselines and PPO), figment~\cite{figment} (5), Figgie-bot~\cite{figgiebot} (8) and figgie-auto~\cite{figgieauto} (7) (\file{RESULTS.md} \S1).
 For figment and Figgie-bot we ran the original code inside its own simulator and fed the same observations to our port. Every decision was identical (144{,}000 of 144{,}000 and 64{,}000 of 64{,}000), and so was every goal posterior (\file{results/verify\_ports.json}).
-The figgie-auto bots run in real time with wall-clock sleeps and an entropy-seeded RNG, so they cannot be replayed and were only checked by code review.
+The real-time figgie-auto bots cannot be replayed and were checked by code review only.
 
 \subsection{Reproducing the CS224R PPO agent}
 The CS224R agent~\cite{cs224r} is the only RL agent for Figgie and released no code, so we reimplemented it from the report.
 A 69-dimensional observation (own hand, cash, all quotes, tick, a card-counting goal posterior and expected card values) feeds a two-layer MLP, a 128-unit GRU cell and a masked categorical actor over the 257 actions (\file{figgie/rl/policy.py}).
 Training is behaviour cloning (BC) from the Bayesian baseline, then recurrent PPO~\cite{ppo} with reward shaping and prioritised fictitious self-play, 32 environments $\times$ 512 steps per update.
 Version v2 up-weights lift actions 15$\times$ in cloning and adds a lift bonus in PPO. Every detail the report omits was filled with a documented guess (\file{DESIGN.md}).
-After 300 updates (4.9\,M steps, one seed) PPO-v2 matches or beats every reported number (Table~\ref{tab:cs224r}). Profits at tables with Random are about twice the reported ones because our Random samples uniformly from the legal actions and loses about \$200 per game, whereas the report does not define its Random.
+After 300 updates (4.9\,M steps, one seed) PPO-v2 matches or beats every reported number (Table~\ref{tab:cs224r}). Profits next to Random are higher because the report does not define its Random and ours plays uniformly over legal actions.
 
 \begin{table}[h]
   \centering\small
@@ -99,7 +99,7 @@ A no-information market maker that values every card at \$8.8 sits mid-table at 
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.92\textwidth]{midterm_results.pdf}
+  \includegraphics[width=0.85\textwidth]{midterm_results.pdf}
   \caption{Goal-suit accuracy over the game for seat 0, 3000 games, 5-fold CV. (a)~Q1: BayesianMM against Bayesian, PotMM and Fundamental. A logistic regression on the hand-only posterior plus public-trade features beats the hand-only posterior from the first trades on (\file{results/proposal\_revelation.json}). (b)~Q2: PPO-v2 at seat 0, linear probes of its current input and its GRU state (\file{results/probe\_ppo\_v2.json}). Chance is 25\%.}
   \label{fig:results}
 \end{figure}
@@ -108,7 +108,7 @@ A no-information market maker that values every card at \$8.8 sits mid-table at 
 We simulated 3000 games at one table (BayesianMM at seat 0 against Bayesian, PotMM and Fundamental) and every 20 ticks predicted seat 0's goal suit in two ways (\file{scripts/proposal\_figure.py}).
 The baseline is the exact posterior given only seat 0's dealt hand. The order-flow model is a logistic regression that adds each opponent's net purchases per suit, the largest net position, and the number and mean price of trades per suit.
 The trades help from the first 20 ticks on (Figure~\ref{fig:results}a). By tick 240 accuracy rises from 38.9\% to 54.0\% and log-loss falls from 1.88 to 1.54 bits, so $\Delta_{\text{rev}}(240)\approx 0.35$ bits (\file{results/proposal\_revelation.json}).
-This is a lower bound, since hand-crafted summaries discard the order and timing of trades and the quotes that did not trade.
+This is a lower bound for one table of heuristic agents, since hand-crafted summaries discard the order and timing of trades and the quotes that did not trade.
 
 \subsection{Q2: a first linear probe of PPO-v2}
 We put PPO-v2 at seat 0 of the same table for 3000 games and recorded its input and its GRU state every 20 ticks (\file{scripts/probe\_ppo.py}). At each tick we fit 5-fold cross-validated logistic regressions on standardised features to predict the goal suit~\cite{probes}. The actor reads only the GRU state.
@@ -150,14 +150,12 @@ Some runs need care. Runs gru\_s0 and none\_s0 were each interrupted three times
 Five runs carry provenance stamps added afterwards from the commit history (\file{scripts/provenance.py}).
 
 \section{Remaining plan}
-All runs fit on a two-GPU server we already have access to, with no rented compute.
 \begin{itemize}
   \item Memory agents (by 21 Nov). Transformer seed 1 and seed 2 of every core are running. Then the supervised sequence model for Q1 on the full trade history and several opponent populations (by 29 Nov).
   \item Interpretability (30 Nov--13 Dec). First, probing every agent on one common set of trajectories (the same games fed through each network), which removes the policy confound above. Then linear and MLP probes giving an extraction score $E_a$ from 0 (hand only) to 1 (as good as the Q1 model), attribution of beliefs to past trades, steering along the probe direction~\cite{actadd} and ablation to price the belief in \$/game.
   \item Leakage and exploitability (7--20 Dec). A classifier per agent predicts its hand from its own actions, giving $L_a$ in bits. One PPO best response per agent (about 10 agents $\times$ 20\,M steps) gives $\hat\varepsilon_a$~\cite{timbers}, and we test the rank correlation of $L_a$ with $\hat\varepsilon_a$.
   \item Poster for the week-15 session (21--27 Dec) and the final report with one reproduction script (by 8 Jan).
 \end{itemize}
-The main caveats are single-seed PPO-v2 numbers, documented guesses for details the CS224R report omits (\file{DESIGN.md}), and Q1 results from one table of heuristic agents, which we will repeat per opponent population.
 
 {\small
 \begin{thebibliography}{99}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
