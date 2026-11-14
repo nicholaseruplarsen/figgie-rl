@@ -108,10 +108,10 @@ def main():
     ap.add_argument("--min-free-gb", type=float, default=4.0)
     ap.add_argument("--job-gb", type=float, default=3.0)
     ap.add_argument("--peer", help="host:root of another queue; skip runs started there and claim ours")
-    ap.add_argument("--only", nargs="*", help="subset like gru:0 transformer:1")
+    ap.add_argument("--only", nargs="*", help="runs in launch order, like gru:0 transformer:1")
     args = ap.parse_args()
 
-    jobs = [(a, s) for a, s in ORDER if not args.only or f"{a}:{s}" in args.only]
+    jobs = [(j.split(":")[0], int(j.split(":")[1])) for j in args.only] if args.only else list(ORDER)
     env = dict(os.environ, CUDA_VISIBLE_DEVICES=args.gpu, OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
     running = {}
     log = lambda m: print(time.strftime("%Y-%m-%d %H:%M:%S"), m, flush=True)  # noqa: E731
