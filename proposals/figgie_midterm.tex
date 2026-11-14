@@ -186,10 +186,32 @@ Concatenating input and GRU state (62.8\%) does slightly worse than the input al
   \end{tabular}
 \end{table}
 
+\subsection{Q2: PPO agents with memory of the trade flow}
+\label{sec:memory}
+The probe above suggests that the information is available but that the CS224R agent has no reason to keep it.
+Its observation summarises the order flow only as cumulative trade counts and last prices per suit, so it never sees \emph{who} bought what.
+We therefore add 16 features to the observation (\file{figgie/rl/features.py}), giving 85 in total: each opponent's net purchases per suit since the agent's last turn, and the mean trade price per suit over the same interval.
+These are increments of a single tick, so an agent without memory sees only the latest trades, and working out which opponent has been accumulating a suit requires integrating them over the game.
+
+All four policies share the CS224R encoder (a two-layer MLP of width 128) and differ only in the memory core that follows it (\file{figgie/rl/policy.py}):
+\begin{itemize}
+  \item none, where the actor sees only the current encoding,
+  \item a minGRU~\cite{mingru}, whose gates depend only on the current input, $h_t=(1-z_t)\odot h_{t-1}+z_t\odot W x_t$,
+  \item the GRU cell of CS224R, and
+  \item a causal two-layer transformer~\cite{transformer} with 4 heads over the last 128 encodings, more than half a game.
+\end{itemize}
+The actor and the critic read only the output of the core, so a probe of that vector sees everything the policy can act on.
+A unit test checks for every core that evaluating one tick at a time and evaluating a stored chunk give the same outputs across episode resets (\file{tests/test\_memory\_policies.py}).
+Training repeats the PPO-v2 recipe exactly: behaviour cloning from Bayesian with lift weight 15, then PPO~\cite{ppo} with the lift bonus and fictitious self-play against the CS224R baselines and the agent's own snapshots.
+Each run takes 2000 updates (33\,M steps, as long as PPO-v2-long), with seeds 0, 1 and 2 for each of the four cores.
+After training, each agent goes through the same probe at the same table as PPO-v2 above, so the four cores and PPO-v2 are compared on identical games.
+
+\textcolor{red}{[Results pending: runs start 16 Nov. This subsection will report goal-suit accuracy of the core probe over the game for each core (mean over seeds), profit in the CS224R matchups, and the gap between the input probe and the core probe.]}
+
 \section{Remaining plan}
 The engine is CPU-bound, so most of the cost is rollouts, and all runs fit on a two-GPU server we already have access to (about 80 hours in total, no rented compute).
 \begin{itemize}
-  \item Memory agents (16--29 Nov). PPO policies with no memory, a minGRU, a GRU and a transformer over the trade history, 3 seeds each (12 runs of about 50\,M steps). The supervised sequence model for Q1, trained on the full trade history and on several opponent populations.
+  \item Memory agents (16--18 Nov). The 12 runs of Section~\ref{sec:memory}, about 20 hours on one GPU. Then the supervised sequence model for Q1, trained on the full trade history and on several opponent populations (by 29 Nov).
   \item Interpretability (30 Nov--13 Dec). Linear and MLP probes of every agent against the true goal suit and the hand-only posterior, giving an extraction score $E_a$ from 0 (hand only) to 1 (as good as the Q1 model). Attribution of beliefs to past trades, steering along the probe direction~\cite{actadd}, activation patching between matched games, and ablation to price the belief in \$/game.
   \item Leakage and exploitability (7--20 Dec). A classifier per agent that predicts the agent's hand from its own actions, giving $L_a$ in bits over the prior. One PPO best response per agent (about 10 agents $\times$ 20\,M steps) against three copies of it, minus a no-information control, giving $\hat\varepsilon_a$, and the rank correlation of $L_a$ with $\hat\varepsilon_a$.
   \item Poster for the week-15 session (21--27 Dec) and the final NeurIPS-format report with a cleaned repository and one reproduction script (by 8 Jan).
@@ -198,7 +220,7 @@ The central tests stay those of the proposal: whether RL agents read the trades 
 
 \section{Caveats}
 \begin{itemize}
-  \item Every PPO number so far comes from a single seed. The memory agents will use three seeds each, and we will rerun PPO-v2 with more seeds before comparing it with them.
+  \item Every PPO-v2 number comes from a single seed. The memory agents use three seeds each, and PPO-v2's GRU (seed 0) is compared with them only as a reference point.
   \item The CS224R report leaves many details open (observation layout, Random's behaviour, several PPO hyperparameters). Our guesses are listed in \file{DESIGN.md} and change absolute profits, though not the ranking.
   \item Tournament numbers depend on the field and are not an equilibrium analysis. Exploitability has no closed form in four-player general-sum games, which is why Q3 uses learned best responses~\cite{timbers}.
   \item The Q1 result covers one table of heuristic agents. Revelation depends on who is trading, so the final measurement will be repeated per opponent population.
@@ -212,6 +234,9 @@ The central tests stay those of the proposal: whether RL agents read the trades 
 \bibitem{cs224r} D.~Li Yang. \newblock Reinforcement learning for Figgie: learning negotiation as a first-class skill. \newblock Stanford CS224R project report, 2026.
 \bibitem{timbers} F.~Timbers et al. \newblock Approximate exploitability: learning a best response. \newblock In \emph{IJCAI}, 2022.
 \bibitem{actadd} A.~M.~Turner et al. \newblock Steering language models with activation engineering. \newblock arXiv:2308.10248, 2023.
+\bibitem{mingru} L.~Feng et al. \newblock Were RNNs all we needed? \newblock arXiv:2410.01201, 2024.
+\bibitem{transformer} A.~Vaswani et al. \newblock Attention is all you need. \newblock In \emph{NeurIPS}, 2017.
+\bibitem{ppo} J.~Schulman et al. \newblock Proximal policy optimization algorithms. \newblock arXiv:1707.06347, 2017.
 \bibitem{probes} G.~Alain and Y.~Bengio. \newblock Understanding intermediate layers using linear classifier probes. \newblock arXiv:1610.01644, 2016.
 \end{thebibliography}
 }
