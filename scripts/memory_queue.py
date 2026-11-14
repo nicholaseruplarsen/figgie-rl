@@ -70,9 +70,9 @@ def free_gb():
     return 0.0
 
 
-def job_script(arch, seed, run, args):
+def job_script(arch, seed, run, args, py=None):
     q = shlex.quote
-    py, code, R = q(sys.executable), q(str(args.code)), str(run)
+    py, code, R = q(py or sys.executable), q(str(args.code)), str(run)
     run = q(R)
     p = lambda name: q(f"{R}/{name}")  # noqa: E731
     tr = f"{py} -m figgie.rl.train"
