@@ -28,7 +28,7 @@ def load(roots):
                 ev = json.loads((d / "eval.json").read_text())
                 runs.setdefault(arch, []).append(dict(
                     seed=int(seed), probe=json.loads((d / "probe.json").read_text()),
-                    eval={k.split(" ", 1)[1]: v["PPO@0"] for k, v in ev.items()}))
+                    eval={k.split(" ", 1)[1]: v["PPO@0"] for k, v in ev.items() if not k.startswith("_")}))
     return runs
 
 
