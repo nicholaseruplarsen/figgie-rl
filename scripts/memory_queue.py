@@ -85,6 +85,8 @@ cd {code}
     --updates {args.updates} --procs {args.procs} --threads {th} --max-vram-gb {args.max_vram_gb} --out {run} > {p("ppo.log")} 2>&1
 [ -f {p("probe.json")} ] || {py} scripts/probe_ppo.py --ckpt {p("final.pt")} --games 3000 --workers {args.procs} \\
     --out {p("probe.json")} > {p("probe.log")} 2>&1
+[ -f {p("eval.json")} ] || {py} scripts/eval_cs224r.py --skip-baselines --ppo {q(arch + "_s" + str(seed) + "=" + R + "/final.pt")} \\
+    --games 1000 --procs {args.procs} --out {p("eval.json")} > {p("eval.log")} 2>&1
 touch {p("DONE")}
 """
 
