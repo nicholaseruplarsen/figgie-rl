@@ -153,6 +153,9 @@ def ppo(args):
     torch.manual_seed(args.seed)
     torch.set_num_threads(args.threads)
     dev = torch.device(args.device)
+    if dev.type == "cuda" and args.max_vram_gb:
+        total = torch.cuda.get_device_properties(dev).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, args.max_vram_gb * 2**30 / total), dev)
     net = load_net(args.init) if args.init else new_net(args)
     assert net.arch == args.arch and net.config["obs_dim"] == (FLOW_DIM if args.flow else OBS_DIM), net.config
     net = net.to(dev)
@@ -256,6 +259,7 @@ def main():
     p.add_argument("--flow", action="store_true", help="85-dim observation with per-opponent trade flow")
     p.add_argument("--window", type=int, default=128, help="transformer context in ticks")
     p.add_argument("--device", default="cpu")
+    p.add_argument("--max-vram-gb", type=float, default=0, help="cap on this process's CUDA allocations")
     # BC
     p.add_argument("--episodes", type=int, default=500)
     p.add_argument("--lift-weight", type=float, default=15.0)

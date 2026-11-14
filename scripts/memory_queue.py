@@ -42,6 +42,10 @@ def gpu_foreign(gpu):
     return out
 
 
+def gpu_free_gb(gpu):
+    return float(sh(f"nvidia-smi -i {gpu} --query-gpu=memory.free --format=csv,noheader,nounits") or 0) / 1024
+
+
 def free_gb():
     for line in open("/proc/meminfo"):
         if line.startswith("MemAvailable"):
@@ -61,7 +65,7 @@ def job_script(arch, seed, run, args):
 cd {code}
 [ -f {p("bc.pt")} ] || {tr} bc {common} --device {dev} --out {p("bc.pt")} > {p("bc.log")} 2>&1
 [ -f {p("final.pt")} ] || {tr} ppo {common} --device {dev} --init {p("bc.pt")} --lift-alpha 0.1 \\
-    --updates {args.updates} --procs {args.procs} --threads {th} --out {run} > {p("ppo.log")} 2>&1
+    --updates {args.updates} --procs {args.procs} --threads {th} --max-vram-gb {args.max_vram_gb} --out {run} > {p("ppo.log")} 2>&1
 [ -f {p("probe.json")} ] || {py} scripts/probe_ppo.py --ckpt {p("final.pt")} --games 3000 --workers {args.procs} \\
     --out {p("probe.json")} > {p("probe.log")} 2>&1
 touch {p("DONE")}
@@ -74,6 +78,10 @@ def main():
     ap.add_argument("--code", default=str(Path(__file__).resolve().parents[1]))
     ap.add_argument("--gpu", default="1", help="'' with --device cpu hides every GPU")
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--share-gpu", action="store_true",
+                    help="launch next to other users when the GPU has --min-free-vram-gb free")
+    ap.add_argument("--min-free-vram-gb", type=float, default=4.0)
+    ap.add_argument("--max-vram-gb", type=float, default=3.0)
     ap.add_argument("--learner-threads", type=int, default=1)
     ap.add_argument("--cpus", default="0-5")
     ap.add_argument("--slots", type=int, default=3)
@@ -95,7 +103,9 @@ def main():
                 log(f"{k} exited {p.returncode}")
                 del running[k]
         if jobs and len(running) < args.slots:
-            foreign = gpu_foreign(args.gpu) if args.device == "cuda" else []
+            foreign = gpu_foreign(args.gpu) if args.device == "cuda" and not args.share_gpu else []
+            if args.device == "cuda" and args.share_gpu and gpu_free_gb(args.gpu) < args.min_free_vram_gb:
+                foreign = [f"only {gpu_free_gb(args.gpu):.1f} GB free"]
             ram = free_gb()
             if foreign:
                 log(f"waiting: foreign processes on GPU {args.gpu}: {foreign}")
