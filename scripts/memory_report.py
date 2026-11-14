@@ -38,9 +38,10 @@ def cell(vals, cis, pct=False):
     v = [k * x for x in vals]
     ci = np.mean([k * c for c in cis])
     f = "{:.1f}" if pct else "{:+.1f}"
-    s = f.format(np.mean(v))
+    g = lambda x: f.format(x).replace("-", "$-$")  # noqa: E731
+    s = g(np.mean(v))
     if len(v) > 1:
-        s += " [" + f.format(min(v)) + "--" + f.format(max(v)) + "]"
+        s += " [" + g(min(v)) + "--" + g(max(v)) + "]"
     return s + f" ($\\pm${ci:.1f})"
 
 
@@ -149,7 +150,7 @@ def main():
     Path(a.tex).write_text(table(runs) + "\n")
     figure(runs, a.fig)
     for label, n, cells in rows(runs):
-        print(f"{label:12s} n={n}  " + ("  |  ".join(c.replace("$\\pm$", "±").replace("--", "–") for c in cells) if cells else "pending"))
+        print(f"{label:12s} n={n}  " + ("  |  ".join(c.replace("$\\pm$", "±").replace("$-$", "-").replace("--", "–") for c in cells) if cells else "pending"))
     for note in anomalies(runs, a.roots, a.updates):
         print("NOTE:", note)
 
