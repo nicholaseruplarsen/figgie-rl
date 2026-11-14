@@ -109,6 +109,8 @@ def main():
     ap.add_argument("--window", type=int, default=128)
     ap.add_argument("--min-free-gb", type=float, default=4.0)
     ap.add_argument("--job-gb", type=float, default=3.0)
+    ap.add_argument("--scope-mem-gb", type=float, default=0,
+                    help="run each job in a systemd --user scope with this MemoryMax and no swap")
     ap.add_argument("--peer", help="host:root of another queue; skip runs started there and claim ours")
     ap.add_argument("--only", nargs="*", help="runs in launch order, like gru:0 transformer:1")
     args = ap.parse_args()
@@ -116,12 +118,21 @@ def main():
     jobs = [(j.split(":")[0], int(j.split(":")[1])) for j in args.only] if args.only else list(ORDER)
     env = dict(os.environ, CUDA_VISIBLE_DEVICES=args.gpu, OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
     running = {}
+    halted = False
     log = lambda m: print(time.strftime("%Y-%m-%d %H:%M:%S"), m, flush=True)  # noqa: E731
     while jobs or running or jobs_running(args.root):
         for k, p in list(running.items()):
             if p.poll() is not None:
                 log(f"{k} exited {p.returncode}")
                 del running[k]
+                if p.returncode != 0:          # e.g. an out-of-memory kill: never relaunch, a human decides
+                    halted = True
+                    log(f"HALT: {k} failed, no further launches until a person restarts the queue")
+        slots_file = Path(args.root) / "SLOTS"
+        if slots_file.exists():
+            args.slots = int(slots_file.read_text().split()[0])
+        if halted:
+            jobs = []
         live = jobs_running(args.root)
         if jobs and jobs[0] and f"{jobs[0][0]}_s{jobs[0][1]}" in live:
             jobs.pop(0)                     # already running under an earlier queue
@@ -151,8 +162,11 @@ def main():
                     subprocess.run(["ssh", host, f"mkdir -p {there} && touch {there}/SKIP"], check=True)
                 run.mkdir(parents=True, exist_ok=True)
                 (run / "job.sh").write_text(job_script(arch, seed, run, args))
-                running[run.name] = subprocess.Popen(["nice", "-n", "10", "taskset", "-c", args.cpus,
-                                                      "bash", str(run / "job.sh")], env=env)
+                cmd = ["nice", "-n", "10", "taskset", "-c", args.cpus, "bash", str(run / "job.sh")]
+                if args.scope_mem_gb:
+                    cmd = ["systemd-run", "--user", "--scope", "--quiet", f"--unit=vint-{run.name}-{int(time.time())}",
+                           "-p", f"MemoryMax={args.scope_mem_gb}G", "-p", "MemorySwapMax=0"] + cmd
+                running[run.name] = subprocess.Popen(cmd, env=env)
                 log(f"launched {run.name} ({ram:.1f} GB free)")
                 time.sleep(120)        # let it allocate before judging RAM again
                 continue
