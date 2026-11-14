@@ -153,6 +153,8 @@ def ppo(args):
     torch.manual_seed(args.seed)
     torch.set_num_threads(args.threads)
     dev = torch.device(args.device)
+    if dev.type == "cuda" and dev.index is None:
+        dev = torch.device("cuda", torch.cuda.current_device())
     if dev.type == "cuda" and args.max_vram_gb:
         total = torch.cuda.get_device_properties(dev).total_memory
         torch.cuda.set_per_process_memory_fraction(min(1.0, args.max_vram_gb * 2**30 / total), dev)
