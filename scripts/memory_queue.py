@@ -107,6 +107,7 @@ def main():
     ap.add_argument("--window", type=int, default=128)
     ap.add_argument("--min-free-gb", type=float, default=4.0)
     ap.add_argument("--job-gb", type=float, default=3.0)
+    ap.add_argument("--peer", help="host:root of another queue; skip runs started there and claim ours")
     ap.add_argument("--only", nargs="*", help="subset like gru:0 transformer:1")
     args = ap.parse_args()
 
@@ -135,8 +136,17 @@ def main():
             else:
                 arch, seed = jobs.pop(0)
                 run = Path(args.root) / f"{arch}_s{seed}"
-                if (run / "DONE").exists():
+                if (run / "DONE").exists() or (run / "SKIP").exists():
+                    log(f"skip {run.name}: done or claimed by another machine")
                     continue
+                if args.peer:
+                    host, root = args.peer.split(":", 1)
+                    there = f"{root}/{run.name}"
+                    r = subprocess.run(["ssh", host, f"test -e {there}/job.sh || test -e {there}/DONE"])
+                    if r.returncode == 0:
+                        log(f"skip {run.name}: already started on {host}")
+                        continue
+                    subprocess.run(["ssh", host, f"mkdir -p {there} && touch {there}/SKIP"], check=True)
                 run.mkdir(parents=True, exist_ok=True)
                 (run / "job.sh").write_text(job_script(arch, seed, run, args))
                 running[run.name] = subprocess.Popen(["nice", "-n", "10", "taskset", "-c", args.cpus,

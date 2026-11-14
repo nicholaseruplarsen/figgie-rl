@@ -6,7 +6,8 @@ actions + scalar critic. The core is one of
   none         no memory: the actor sees only the current encoding
   mingru       minGRU (Feng et al. 2024): h = (1-z) h + z W x, gates from x only
   gru          GRUCell, the CS224R architecture (default, matches old checkpoints)
-  transformer  causal 2-layer transformer over the last `window` encodings
+  transformer  causal 2-layer transformer, each tick attending to the last `window`
+               ticks of its episode at every layer (cached keys and values)
 
 State is a flat [B, S] tensor for every core so the trainer can store and reset
 it uniformly. `step` is one tick, `unroll` replays a chunk from a stored state
@@ -24,6 +25,27 @@ H = 128
 ARCHS = ("none", "mingru", "gru", "transformer")
 
 
+class Block(nn.Module):
+    """Pre-norm transformer block whose queries are the new ticks and whose keys
+    and values also cover cached earlier ticks."""
+
+    def __init__(self, h, heads):
+        super().__init__()
+        self.heads = heads
+        self.ln1, self.ln2 = nn.LayerNorm(h), nn.LayerNorm(h)
+        self.q, self.kv, self.o = nn.Linear(h, h), nn.Linear(h, 2 * h), nn.Linear(h, h)
+        self.ff = nn.Sequential(nn.Linear(h, 2 * h), nn.ReLU(), nn.Linear(2 * h, h))
+
+    def forward(self, x, full, mask):
+        B, T, H = x.shape
+        n, d = self.heads, H // self.heads
+        q = self.q(self.ln1(x)).view(B, T, n, d).transpose(1, 2)
+        k, v = self.kv(self.ln1(full)).view(B, -1, 2, n, d).permute(2, 0, 3, 1, 4)
+        a = nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask[:, None])
+        x = x + self.o(a.transpose(1, 2).reshape(B, T, H))
+        return x + self.ff(self.ln2(x))
+
+
 class ActorCritic(nn.Module):
     def __init__(self, arch="gru", obs_dim=OBS_DIM, hidden=H, n_actions=N_ACTIONS, window=128, layers=2, heads=4):
         super().__init__()
@@ -37,9 +59,7 @@ class ActorCritic(nn.Module):
             self.mz = nn.Linear(hidden, hidden)
             self.mh = nn.Linear(hidden, hidden)
         elif arch == "transformer":
-            layer = nn.TransformerEncoderLayer(hidden, heads, 2 * hidden, dropout=0.0, batch_first=True,
-                                               norm_first=True)
-            self.tf = nn.TransformerEncoder(layer, layers, enable_nested_tensor=False)
+            self.blocks = nn.ModuleList(Block(hidden, heads) for _ in range(layers))
             self.tf_norm = nn.LayerNorm(hidden)
         self.actor = nn.Linear(hidden, n_actions)
         self.critic = nn.Linear(hidden, 1)
@@ -52,21 +72,37 @@ class ActorCritic(nn.Module):
         if self.arch == "none":
             return 1
         if self.arch == "transformer":
-            return (self.window - 1) * (self.hidden + 1)     # last window-1 encodings + valid flags
+            # every layer's inputs for the last window-1 ticks (a KV cache), plus their valid flags
+            return (len(self.blocks) * self.hidden + 1) * (self.window - 1)
         return self.hidden
 
     def init_state(self, b, device=None):
         return torch.zeros(b, self.state_dim, device=device)
 
-    def _split(self, s):
-        k, h = self.window - 1, self.hidden
-        return s[:, :k * h].view(-1, k, h), s[:, k * h:]
+    def _tf(self, e, s, done):
+        """Sliding-window causal attention with cached layer inputs.
 
-    # ---- cores
-    def _tf_windows(self, tok, valid):
-        """tok [N, K, H], valid [N, K] bool (last token always valid) -> output at last token [N, H]."""
-        out = self.tf(tok, src_key_padding_mask=~valid)
-        return self.tf_norm(out[:, -1])
+        e [B, T, H] new encodings, s [B, S] state, done [B, T] (1 = episode starts at that tick).
+        Each query attends to the last `window` ticks of its own episode, at every layer.
+        """
+        B, T, H = e.shape
+        C, K, L = self.window - 1, self.window, len(self.blocks)
+        cache = s[:, :L * C * H].view(B, L, C, H)
+        valid = torch.cat([s[:, L * C * H:] > 0.5, torch.ones(B, T, dtype=torch.bool, device=e.device)], 1)
+        ep_new = done.cumsum(1)
+        ep = torch.cat([torch.zeros(B, C, device=e.device), ep_new], 1)
+        pos = torch.arange(C + T, device=e.device)
+        qpos = C + torch.arange(T, device=e.device)
+        band = (pos[None] <= qpos[:, None]) & (pos[None] > qpos[:, None] - K)          # [T, C+T]
+        mask = band[None] & valid[:, None] & (ep[:, None] == ep_new[:, :, None])      # [B, T, C+T]
+        x, new_cache = e, []
+        for l, blk in enumerate(self.blocks):
+            full = torch.cat([cache[:, l], x], 1)
+            new_cache.append(full[:, -C:])
+            x = blk(x, full, mask)
+        keep = valid[:, -C:] & (ep[:, -C:] == ep_new[:, -1:])
+        ns = torch.cat([torch.stack(new_cache, 1).reshape(B, -1), keep.float()], 1)
+        return self.tf_norm(x), ns
 
     def core_step(self, e, s):
         if self.arch == "none":
@@ -78,12 +114,8 @@ class ActorCritic(nn.Module):
             z = torch.sigmoid(self.mz(e))
             h = (1 - z) * s + z * self.mh(e)
             return h, h
-        tok, val = self._split(s)
-        tok = torch.cat([tok, e.unsqueeze(1)], 1)
-        val = torch.cat([val > 0.5, torch.ones_like(val[:, :1], dtype=torch.bool)], 1)
-        z = self._tf_windows(tok, val)
-        ns = torch.cat([tok[:, 1:].reshape(len(e), -1), val[:, 1:].float()], 1)
-        return z, ns
+        z, ns = self._tf(e.unsqueeze(1), s, torch.zeros(len(e), 1, device=e.device))
+        return z[:, 0], ns
 
     def step(self, x, s, mask):
         z, s = self.core_step(self.enc(x), s)
@@ -127,18 +159,8 @@ class ActorCritic(nn.Module):
         return torch.cat(hs)
 
     def _tf_unroll(self, e, s0, done):
-        T, B, Hd = e.shape
-        K = self.window
-        s0 = s0 * (1 - done[0]).unsqueeze(-1)
-        tok0, val0 = self._split(s0)                                   # [B, K-1, H], [B, K-1]
-        seq = torch.cat([tok0, e.transpose(0, 1)], 1)                  # [B, K-1+T, H]
-        val = torch.cat([val0 > 0.5, torch.ones(B, T, dtype=torch.bool, device=e.device)], 1)
-        ep = torch.cat([torch.zeros(B, K - 1, device=e.device), done.transpose(0, 1).cumsum(1)], 1)
-        idx = torch.arange(T, device=e.device).unsqueeze(1) + torch.arange(K, device=e.device)  # [T, K]
-        win, wv, wep = seq[:, idx], val[:, idx], ep[:, idx]           # [B, T, K, ...]
-        wv = wv & (wep == wep[..., -1:])
-        z = self._tf_windows(win.reshape(B * T, K, Hd), wv.reshape(B * T, K))
-        return z.view(B, T, Hd).transpose(0, 1)
+        z, _ = self._tf(e.transpose(0, 1), s0 * (1 - done[0]).unsqueeze(-1), done.transpose(0, 1))
+        return z.transpose(0, 1)
 
 
 def ActorCriticRecurrent(**kw):
