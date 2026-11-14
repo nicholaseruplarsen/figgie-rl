@@ -242,7 +242,7 @@ def ppo(args):
         logf.write(json.dumps(row) + "\n")
         logf.flush()
         if upd % 25 == 0 or upd == args.updates:
-            save(net, os.path.join(args.out, f"update_{upd}.pt"))
+            save(net, os.path.join(args.out, "latest.pt"))     # one rolling checkpoint keeps disk use small
     save(net, os.path.join(args.out, "final.pt"))
     venv.close()
 
