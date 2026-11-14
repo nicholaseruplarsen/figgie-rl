@@ -139,10 +139,10 @@ Every comparison the file does not list is exploratory, and no setting is adopte
 
 Scored against the file (Table~\ref{tab:memory}), the core without memory (54.0\%) and the GRU (47.1\%) fall inside their predicted ranges, and the minGRU (58.0\%) lies above its range of 43--52\%.
 Among these three the predicted order (none $>$ GRU $\approx$ minGRU) was wrong, and the observed order is minGRU $>$ none $>$ GRU.
-The minGRU met the preregistered probe criterion with $n=2$, confounded by policy: it beats the no-memory core by 4.0 points, and its worse seed (57.7\%) beats the better no-memory seed (54.8\%).
-The confound is that every agent receives the same observation, yet the probe on the current input ranges from 60.1\% to 64.7\% across agents. Each agent's probe is trained and tested on the games that agent played, so the probe numbers mix representation with policy, and a 4-point gap lies within that spread.
+The minGRU meets the pre-registered criterion with two seeds, confounded by policy: it beats the no-memory core by 4.0 points, and its worse seed (57.7\%) beats the better no-memory seed (54.8\%).
+The confound is that every agent receives the same observation, yet the probe on the current input ranges from 60.1\% to 64.7\% across agents. Each agent is probed on games it played itself, so the probe numbers mix representation with policy, and a 4-point gap lies within that spread.
 We therefore do not claim that memory helps. The minGRU fails the profit criterion ($+12.8$ against $+14.9$ \$/game), and the GRU meets neither criterion.
-The transformer is not a result yet. It is a single seed with a likely degenerate policy (about 1 lift per game against FV + Bayes + MM, against 5--6 for the other cores), under investigation, and we draw no conclusions from it.
+The transformer is not a result yet. It is a single seed with a likely degenerate policy (about 1 lift per game against FV + Bayes + MM, against 5--6 for the other cores), under investigation, and we draw no conclusion from it until seed 1.
 
 Two exploratory observations stand out. The flow features alone go a long way, since the core without memory reaches 54.0\% against 41.2\% for the PPO-v2 GRU.
 And no core's last hidden state is more informative than a probe of that agent's current input, so no memory core yet adds information the input lacks.
@@ -153,7 +153,7 @@ Five runs carry provenance stamps added afterwards from the commit history (\fil
 All runs fit on a two-GPU server we already have access to, with no rented compute.
 \begin{itemize}
   \item Memory agents (by 21 Nov). Transformer seed 1 and seed 2 of every core are running. Then the supervised sequence model for Q1 on the full trade history and several opponent populations (by 29 Nov).
-  \item Interpretability (30 Nov--13 Dec). Linear and MLP probes of every agent on one common set of trajectories (the same games fed through each network, which removes the policy confound above), giving an extraction score $E_a$ from 0 (hand only) to 1 (as good as the Q1 model), attribution of beliefs to past trades, steering along the probe direction~\cite{actadd} and ablation to price the belief in \$/game.
+  \item Interpretability (30 Nov--13 Dec). First, probing every agent on one common set of trajectories (the same games fed through each network), which removes the policy confound above. Then linear and MLP probes giving an extraction score $E_a$ from 0 (hand only) to 1 (as good as the Q1 model), attribution of beliefs to past trades, steering along the probe direction~\cite{actadd} and ablation to price the belief in \$/game.
   \item Leakage and exploitability (7--20 Dec). A classifier per agent predicts its hand from its own actions, giving $L_a$ in bits. One PPO best response per agent (about 10 agents $\times$ 20\,M steps) gives $\hat\varepsilon_a$~\cite{timbers}, and we test the rank correlation of $L_a$ with $\hat\varepsilon_a$.
   \item Poster for the week-15 session (21--27 Dec) and the final report with one reproduction script (by 8 Jan).
 \end{itemize}
