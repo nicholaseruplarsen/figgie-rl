@@ -11,6 +11,7 @@ CPUs in --cpus and to GPU --gpu. A finished job writes DONE in its run dir.
 """
 import argparse
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -49,18 +50,21 @@ def free_gb():
 
 
 def job_script(arch, seed, run, args):
-    py = sys.executable
+    q = shlex.quote
+    py, code, R = q(sys.executable), q(str(args.code)), str(run)
+    run = q(R)
+    p = lambda name: q(f"{R}/{name}")  # noqa: E731
     tr = f"{py} -m figgie.rl.train"
     common = f"--arch {arch} --flow --seed {seed} --window {args.window}"
     dev, th = args.device, args.learner_threads
     return f"""set -e
-cd {args.code}
-[ -f {run}/bc.pt ] || {tr} bc {common} --device {dev} --out {run}/bc.pt > {run}/bc.log 2>&1
-[ -f {run}/final.pt ] || {tr} ppo {common} --device {dev} --init {run}/bc.pt --lift-alpha 0.1 \\
-    --updates {args.updates} --procs {args.procs} --threads {th} --out {run} > {run}/ppo.log 2>&1
-[ -f {run}/probe.json ] || {py} scripts/probe_ppo.py --ckpt {run}/final.pt --games 3000 --workers {args.procs} \\
-    --out {run}/probe.json > {run}/probe.log 2>&1
-touch {run}/DONE
+cd {code}
+[ -f {p("bc.pt")} ] || {tr} bc {common} --device {dev} --out {p("bc.pt")} > {p("bc.log")} 2>&1
+[ -f {p("final.pt")} ] || {tr} ppo {common} --device {dev} --init {p("bc.pt")} --lift-alpha 0.1 \\
+    --updates {args.updates} --procs {args.procs} --threads {th} --out {run} > {p("ppo.log")} 2>&1
+[ -f {p("probe.json")} ] || {py} scripts/probe_ppo.py --ckpt {p("final.pt")} --games 3000 --workers {args.procs} \\
+    --out {p("probe.json")} > {p("probe.log")} 2>&1
+touch {p("DONE")}
 """
 
 
