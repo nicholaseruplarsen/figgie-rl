@@ -52,11 +52,12 @@ def job_script(arch, seed, run, args):
     py = sys.executable
     tr = f"{py} -m figgie.rl.train"
     common = f"--arch {arch} --flow --seed {seed} --window {args.window}"
+    dev, th = args.device, args.learner_threads
     return f"""set -e
 cd {args.code}
-[ -f {run}/bc.pt ] || {tr} bc {common} --device cuda --out {run}/bc.pt > {run}/bc.log 2>&1
-[ -f {run}/final.pt ] || {tr} ppo {common} --device cuda --init {run}/bc.pt --lift-alpha 0.1 \\
-    --updates {args.updates} --procs {args.procs} --threads 1 --out {run} > {run}/ppo.log 2>&1
+[ -f {run}/bc.pt ] || {tr} bc {common} --device {dev} --out {run}/bc.pt > {run}/bc.log 2>&1
+[ -f {run}/final.pt ] || {tr} ppo {common} --device {dev} --init {run}/bc.pt --lift-alpha 0.1 \\
+    --updates {args.updates} --procs {args.procs} --threads {th} --out {run} > {run}/ppo.log 2>&1
 [ -f {run}/probe.json ] || {py} scripts/probe_ppo.py --ckpt {run}/final.pt --games 3000 --workers {args.procs} \\
     --out {run}/probe.json > {run}/probe.log 2>&1
 touch {run}/DONE
@@ -67,7 +68,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=os.path.expanduser("~/figgie-mem/runs"))
     ap.add_argument("--code", default=str(Path(__file__).resolve().parents[1]))
-    ap.add_argument("--gpu", default="1")
+    ap.add_argument("--gpu", default="1", help="'' with --device cpu hides every GPU")
+    ap.add_argument("--device", default="cuda")
+    ap.add_argument("--learner-threads", type=int, default=1)
     ap.add_argument("--cpus", default="0-5")
     ap.add_argument("--slots", type=int, default=3)
     ap.add_argument("--procs", type=int, default=2)
@@ -88,7 +91,8 @@ def main():
                 log(f"{k} exited {p.returncode}")
                 del running[k]
         if jobs and len(running) < args.slots:
-            foreign, ram = gpu_foreign(args.gpu), free_gb()
+            foreign = gpu_foreign(args.gpu) if args.device == "cuda" else []
+            ram = free_gb()
             if foreign:
                 log(f"waiting: foreign processes on GPU {args.gpu}: {foreign}")
             elif ram < args.min_free_gb + args.job_gb:
