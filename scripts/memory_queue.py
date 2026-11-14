@@ -46,6 +46,23 @@ def gpu_free_gb(gpu):
     return float(sh(f"nvidia-smi -i {gpu} --query-gpu=memory.free --format=csv,noheader,nounits") or 0) / 1024
 
 
+def jobs_running(root):
+    """Run dirs with a live job.sh, including jobs started by an earlier queue process."""
+    out = set()
+    for d in Path("/proc").iterdir():
+        if not d.name.isdigit():
+            continue
+        try:
+            cmd = (d / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        for part in cmd:
+            t = part.decode(errors="ignore")
+            if t.startswith(str(root)) and t.endswith("/job.sh"):
+                out.add(Path(t).parent.name)
+    return out
+
+
 def free_gb():
     for line in open("/proc/meminfo"):
         if line.startswith("MemAvailable"):
@@ -97,12 +114,16 @@ def main():
     env = dict(os.environ, CUDA_VISIBLE_DEVICES=args.gpu, OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
     running = {}
     log = lambda m: print(time.strftime("%Y-%m-%d %H:%M:%S"), m, flush=True)  # noqa: E731
-    while jobs or running:
+    while jobs or running or jobs_running(args.root):
         for k, p in list(running.items()):
             if p.poll() is not None:
                 log(f"{k} exited {p.returncode}")
                 del running[k]
-        if jobs and len(running) < args.slots:
+        live = jobs_running(args.root)
+        if jobs and jobs[0] and f"{jobs[0][0]}_s{jobs[0][1]}" in live:
+            jobs.pop(0)                     # already running under an earlier queue
+            continue
+        if jobs and len(live | set(running)) < args.slots:
             foreign = gpu_foreign(args.gpu) if args.device == "cuda" and not args.share_gpu else []
             if args.device == "cuda" and args.share_gpu and gpu_free_gb(args.gpu) < args.min_free_vram_gb:
                 foreign = [f"only {gpu_free_gb(args.gpu):.1f} GB free"]
