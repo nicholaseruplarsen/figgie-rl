@@ -100,6 +100,9 @@ def main():
                 OUT[f"{tag} {m}"] = summarize(res)
                 s = OUT[f"{tag} {m}"]["PPO@0"]
                 print(tag, m, json.dumps(s), flush=True)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from provenance import provenance
+    OUT["_provenance"] = provenance(script="scripts/eval_cs224r.py")
     json.dump(OUT, open(a.out, "w"), indent=1)
 
 

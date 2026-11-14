@@ -11,7 +11,7 @@ for d in map(Path, sys.argv[1:]):
         print(d.name, "unfinished")
         continue
     ev, pr = json.loads((d / "eval.json").read_text()), json.loads((d / "probe.json").read_text())
-    rows = {k.split(" ", 1)[1]: v["PPO@0"] for k, v in ev.items()}
+    rows = {k.split(" ", 1)[1]: v["PPO@0"] for k, v in ev.items() if not k.startswith("_")}
     i100, iend = pr["t"].index(100), len(pr["t"]) - 1
     print(f"== {d.name}")
     for m, s in rows.items():
