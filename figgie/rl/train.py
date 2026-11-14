@@ -158,7 +158,16 @@ def ppo(args):
     if dev.type == "cuda" and args.max_vram_gb:
         total = torch.cuda.get_device_properties(dev).total_memory
         torch.cuda.set_per_process_memory_fraction(min(1.0, args.max_vram_gb * 2**30 / total), dev)
-    net = load_net(args.init) if args.init else new_net(args)
+    first = 0
+    latest = os.path.join(args.out, "latest.pt")
+    if args.resume and os.path.exists(latest):
+        # Resume weights only: the Adam state and the PFSP pool start afresh.
+        first = torch.load(latest, map_location="cpu", weights_only=True).get("update") or args.start_update
+        assert first, "latest.pt has no update number, pass --start-update"
+        net = load_net(latest)
+        print(json.dumps(dict(resumed_from=first)), flush=True)
+    else:
+        net = load_net(args.init) if args.init else new_net(args)
     assert net.arch == args.arch and net.config["obs_dim"] == (FLOW_DIM if args.flow else OBS_DIM), net.config
     net = net.to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
@@ -172,7 +181,7 @@ def ppo(args):
     start = torch.ones(B, device=dev)
     os.makedirs(args.out, exist_ok=True)
     logf = open(os.path.join(args.out, "train_log.jsonl"), "a")
-    for upd in range(1, args.updates + 1):
+    for upd in range(first + 1, args.updates + 1):
         t0 = time.time()
         Xs = torch.zeros(T, B, D, device=dev)
         Ms = torch.zeros(T, B, 257, dtype=torch.bool, device=dev)
@@ -247,7 +256,7 @@ def ppo(args):
         logf.write(json.dumps(row) + "\n")
         logf.flush()
         if upd % 25 == 0 or upd == args.updates:
-            save(net, os.path.join(args.out, "latest.pt"))     # one rolling checkpoint keeps disk use small
+            save(net, latest, update=upd)     # one rolling checkpoint keeps disk use small
     save(net, os.path.join(args.out, "final.pt"))
     venv.close()
 
@@ -261,6 +270,8 @@ def main():
     p.add_argument("--flow", action="store_true", help="85-dim observation with per-opponent trade flow")
     p.add_argument("--window", type=int, default=128, help="transformer context in ticks")
     p.add_argument("--device", default="cpu")
+    p.add_argument("--resume", action="store_true", help="continue from OUT/latest.pt if present")
+    p.add_argument("--start-update", type=int, default=0, help="update number of a latest.pt saved without one")
     p.add_argument("--max-vram-gb", type=float, default=0, help="cap on this process's CUDA allocations")
     # BC
     p.add_argument("--episodes", type=int, default=500)

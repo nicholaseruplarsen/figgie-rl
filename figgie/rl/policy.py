@@ -170,8 +170,8 @@ class PolicyAgent:
         return decode(a)
 
 
-def save(net, path):
-    torch.save(dict(config=net.config, state_dict=net.state_dict()), path)
+def save(net, path, **extra):
+    torch.save(dict(config=net.config, state_dict=net.state_dict(), **extra), path)
 
 
 def load_net(path):

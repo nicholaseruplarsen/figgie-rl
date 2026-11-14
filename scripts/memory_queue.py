@@ -81,7 +81,7 @@ def job_script(arch, seed, run, args):
     return f"""set -e
 cd {code}
 [ -f {p("bc.pt")} ] || {tr} bc {common} --device {dev} --out {p("bc.pt")} > {p("bc.log")} 2>&1
-[ -f {p("final.pt")} ] || {tr} ppo {common} --device {dev} --init {p("bc.pt")} --lift-alpha 0.1 \\
+[ -f {p("final.pt")} ] || {tr} ppo {common} --device {dev} --init {p("bc.pt")} --lift-alpha 0.1 --resume \\
     --updates {args.updates} --procs {args.procs} --threads {th} --max-vram-gb {args.max_vram_gb} --out {run} > {p("ppo.log")} 2>&1
 [ -f {p("probe.json")} ] || {py} scripts/probe_ppo.py --ckpt {p("final.pt")} --games 3000 --workers {args.procs} \\
     --out {p("probe.json")} > {p("probe.log")} 2>&1
