@@ -1,6 +1,6 @@
 # Figgie memory agents: prediction written before the full table
 
-Written by Geoff, 2026-11-14 ~11:15 UTC, before the full table. GRU s0 and none s0 were already seen (47.1% and 53.3% probe), so this is not blind to them.
+Written by Geoff on 2026-11-14 before the full table. The "~11:15 UTC" time first written here was a guess and is wrong: the file was written some time between 11:12 and 14:52 CET, and the only verified time is its commit, b64e174 at 15:16 CET. By then minGRU s0, GRU s1 and none s1 had finished, but Geoff had not seen their numbers. GRU s0 and none s0 were already seen (47.1% and 53.3% probe), so this is not blind to them.
 
 Caveat: the GRU and no-memory predictions were made after seeing their seed-0 results, so they are not blind. Only the transformer and minGRU predictions are clean. The midterm must say this where it scores the table.
 
