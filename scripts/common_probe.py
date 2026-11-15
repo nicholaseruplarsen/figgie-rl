@@ -121,8 +121,9 @@ def main():
         res["nets"][name] = dict(arch=net.arch, acc=acc, ll=ll, trained=bool(path))
         print(name, round(acc, 3), round(ll, 3), flush=True)
     res["seconds"] = round(time.time() - t0, 1)
-    from provenance import provenance
+    from provenance import provenance, flag_exploratory
     res["_provenance"] = provenance(script="scripts/common_probe.py")
+    res = flag_exploratory(res, always=True)       # the exploratory baseline, never scored
     Path(a.out).write_text(json.dumps(res, indent=1))
     print(a.out, res["seconds"], "s")
 

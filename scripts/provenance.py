@@ -8,6 +8,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def flag_exploratory(res, always=False):
+    """Bret's platform convention: results written with COMPUTE_EXPLORATORY=1 (or always=True)
+    carry "exploratory": true at the top level, and the auto-scorer and /resolve refuse them."""
+    if always or os.environ.get("COMPUTE_EXPLORATORY") == "1":
+        return {"exploratory": True, **res}
+    return res
+
+
 def provenance(**extra):
     try:
         h = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True,
