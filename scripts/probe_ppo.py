@@ -109,8 +109,9 @@ def main():
             res[f"{name}_ll"].append(ll)
         print(t, {k2: (round(v[0], 3), round(v[1], 3)) for k2, v in rows.items()}, flush=True)
     res["seconds"] = round(time.time() - t0, 1)
-    from provenance import provenance
+    from provenance import provenance, flag_exploratory
     res["_provenance"] = provenance(script="scripts/probe_ppo.py")
+    res = flag_exploratory(res)
     Path(args.out).write_text(json.dumps(res, indent=1))
     print(args.out, res["seconds"], "s")
 

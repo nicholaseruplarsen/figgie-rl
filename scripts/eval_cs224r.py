@@ -101,8 +101,9 @@ def main():
                 s = OUT[f"{tag} {m}"]["PPO@0"]
                 print(tag, m, json.dumps(s), flush=True)
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from provenance import provenance
+    from provenance import provenance, flag_exploratory
     OUT["_provenance"] = provenance(script="scripts/eval_cs224r.py")
+    OUT = flag_exploratory(OUT)
     json.dump(OUT, open(a.out, "w"), indent=1)
 
 

@@ -43,8 +43,9 @@ def main():
         print(ckpt, round(true_acc, 4), round(perm_acc, 4), flush=True)
     res["shuffled_mean_pct"] = round(100 * float(np.mean([r["shuffled_acc"] for r in res["runs"]])), 2)
     res["true_mean_pct"] = round(100 * float(np.mean([r["true_acc"] for r in res["runs"]])), 2)
-    from provenance import provenance
+    from provenance import provenance, flag_exploratory
     res["_provenance"] = provenance(script="scripts/placebo_probe.py")
+    res = flag_exploratory(res)
     Path(a.out).write_text(json.dumps(res, indent=1))
     print(a.out, res["true_mean_pct"], res["shuffled_mean_pct"])
 
