@@ -10,6 +10,8 @@ processes, so learner PSS + worker PSS is close to what the cgroup is charged.
 """
 import argparse
 import json
+import os
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -65,6 +67,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--train-log", required=True)
     ap.add_argument("--every", type=float, default=5.0)
+    ap.add_argument("--kill-mb", type=int, default=0, help="stop the run once the cgroup peak passes this")
     ap.add_argument("cmd", nargs=argparse.REMAINDER)
     a = ap.parse_args()
     cmd = a.cmd[1:] if a.cmd and a.cmd[0] == "--" else a.cmd
@@ -83,6 +86,16 @@ def main():
                        cgroup_mb=cur // 2**20 if cur else None, cgroup_peak_mb=peak // 2**20 if peak else None)
             f.write(json.dumps(row) + "\n")
             f.flush()
+            if a.kill_mb and (row["cgroup_peak_mb"] or row["cgroup_mb"] or 0) > a.kill_mb:
+                for k in [p.pid] + kids:
+                    try:
+                        os.kill(k, signal.SIGTERM)
+                    except OSError:
+                        pass
+                f.write(json.dumps(dict(t=row["t"], killed=f"cgroup peak {row['cgroup_peak_mb']} MB > {a.kill_mb} MB")) + "\n")
+                f.flush()
+                p.wait()
+                break
             time.sleep(a.every)
         f.write(json.dumps(dict(t=round(time.time() - t0, 1), exit=p.returncode)) + "\n")
     raise SystemExit(p.returncode)
