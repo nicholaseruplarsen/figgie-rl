@@ -174,7 +174,7 @@ def ppo(args):
     pool = Pool(p_sp=args.p_sp, net_config=net.config)
     venv = VecEnv(args.envs, args.procs, args.seed,
                   dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha, flow=args.flow),
-                  dict(p_sp=args.p_sp, net_config=net.config))
+                  dict(p_sp=args.p_sp, net_config=net.config), start=args.mp_start)
     B, T, D = args.envs, args.steps, net.config["obs_dim"]
     Xc, Mc = venv.reset()
     h = net.init_state(B, dev)
@@ -298,6 +298,8 @@ def main():
     p.add_argument("--snap-every", type=int, default=20)
     p.add_argument("--threads", type=int, default=4)
     p.add_argument("--procs", type=int, default=4, help="env worker processes")
+    p.add_argument("--mp-start", default="fork", choices=["fork", "spawn", "forkserver"],
+                   help="how env workers are started, spawn avoids inheriting the learner's memory")
     a = p.parse_args()
     if a.mode == "bc":
         a.epochs, a.lr = a.epochs or 10, a.lr or 1e-3
