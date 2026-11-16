@@ -241,7 +241,7 @@ def ppo(args):
                 loss.backward()
                 stats["pg"] += pg.item(); stats["vf"] += vf.item(); stats["ent"] += ent.item(); stats["n"] += 1
                 if (k + 1) % args.accum == 0 or k == len(chunks) - 1:
-                    torch.nn.utils.clip_grad_norm_(net.parameters(), 0.5)
+                    torch.nn.utils.clip_grad_norm_(net.parameters(), args.max_grad_norm)
                     opt.step()
                     opt.zero_grad()
         if upd > args.warmup and upd % args.snap_every == 0:
@@ -291,6 +291,7 @@ def main():
     p.add_argument("--clip", type=float, default=0.2)
     p.add_argument("--ent", type=float, default=0.01)
     p.add_argument("--vf", type=float, default=0.5)
+    p.add_argument("--max-grad-norm", type=float, default=0.5, help="PPO gradient clip (shared iig/tune core space)")
     p.add_argument("--beta", type=float, default=0.5)
     p.add_argument("--lift-alpha", type=float, default=0.0)
     p.add_argument("--p-sp", type=float, default=0.3)
