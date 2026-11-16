@@ -42,8 +42,8 @@ Every published Figgie agent infers the goal suit from its own cards, yet every 
 Our project asks how much the order flow reveals, whether reinforcement-learning (RL) agents with memory learn to read it, and whether agents that leak their own hand are easier to exploit.
 At the midterm we have a shared game engine with 25 agents ported from four public sources (two of them ported decision for decision), a reproduction of the only RL agent for Figgie that matches or beats its reported numbers, and a 16{,}000-game tournament of 29 agents.
 A simple model of the public trades raises goal-suit accuracy from 39\% (own hand only) to 54\% by the end of a game.
-A first linear probe of the PPO agent's recurrent state finds that its memory holds no more about the goal suit than the card-counting posterior it is given as input (41\% against 43\%), although the input itself supports 65\%.
-With features of who traded what, a minGRU core meets our preregistered probe criterion on its two sealed seeds (58\% against 54\% without memory), though the comparison is confounded by policy, its accuracy missed our own prediction, and it does not meet the profit criterion.
+A first linear probe of the PPO agent's recurrent state finds no more about the goal suit than its card-counting input (41\% against 43\%).
+With features of who traded what, untrained random-init networks of every memory architecture probe at 59--60\% on common trajectories, and every trained agent probes 6--16 points lower, so this probe measures input features rather than learned belief and cannot show that memory helps.
 \end{abstract}
 
 \section{Problem and questions}
@@ -68,7 +68,6 @@ The approved proposal asks three questions:
 \subsection{A shared engine and verified agents}
 All data is simulated in our engine (\file{figgie/engine.py}), which implements the standard rules and the CS224R discretisation: 240 ticks, one action per player per tick in a random order, 257 discrete actions, prices \$1--\$30, and every trade wipes the book.
 The simulator logs the deck and all hands, so every sample carries exact ground truth.
-One game takes about 11\,ms on one CPU core (85{,}000 decisions/s).
 We ported 25 agents from four public sources: the CS224R report~\cite{cs224r} (5 baselines and PPO), figment~\cite{figment} (5), Figgie-bot~\cite{figgiebot} (8) and figgie-auto~\cite{figgieauto} (7) (\file{RESULTS.md} \S1).
 For figment and Figgie-bot we ran the original code inside its own simulator and fed the same observations to our port. Every decision was identical (144{,}000 of 144{,}000 and 64{,}000 of 64{,}000), and so was every goal posterior (\file{results/verify\_ports.json}).
 The real-time figgie-auto bots cannot be replayed and were checked by code review only.
@@ -78,23 +77,8 @@ The CS224R agent~\cite{cs224r} is the only RL agent for Figgie and released no c
 A 69-dimensional observation (own hand, cash, all quotes, tick, a card-counting goal posterior and expected card values) feeds a two-layer MLP, a 128-unit GRU cell and a masked categorical actor over the 257 actions (\file{figgie/rl/policy.py}).
 Training is behaviour cloning (BC) from the Bayesian baseline, then recurrent PPO~\cite{ppo} with reward shaping and prioritised fictitious self-play, 32 environments $\times$ 512 steps per update.
 Version v2 up-weights lift actions 15$\times$ in cloning and adds a lift bonus in PPO. Every detail the report omits was filled with a documented guess (\file{DESIGN.md}).
-After 300 updates (4.9\,M steps, one seed) PPO-v2 matches or beats every reported number (Table~\ref{tab:cs224r}). Profits next to Random are higher because the report does not define its Random and ours plays uniformly over legal actions.
+After 300 updates (4.9\,M steps, one seed) PPO-v2 matches or beats every reported number of the report's Table~1 (\file{results/cs224r\_eval.json}). Against FV + Cons + MM it earns $+21.5$ \$/game and wins 52\% (reported $+8$, 54\%), and against FV + Bayes + MM $+12.7$ and 53\% (reported $+2$, 36\%), with 95\% CIs of about $\pm$4--5 (FV = FairValue, Cons = Conservative, MM = MarketMaker).
 
-\begin{table}[h]
-  \centering\small
-  \caption{CS224R Table~1 matchups, 1000 games each, seats rotated, greedy actions. Profit in \$/game (95\% CI about $\pm$4--5) and win rate (\file{results/cs224r\_eval.json}). FV = FairValue, R = Random, Cons = Conservative, MM = MarketMaker.}
-  \label{tab:cs224r}
-  \begin{tabular}{@{}lrrrrr@{}}
-    \toprule
-    Opponents & Reported v1 & Ours v1 & Reported v2 & Ours v2 & Ours, no BC \\
-    \midrule
-    3$\times$Random & +118, 89\% & +135, 76\% & +164, 98\% & +278, 99\% & +178, 95\% \\
-    Bayes + 2$\times$R & +77, 4\% & +107, 38\% & +112, 10\% & +233, 92\% & +144, 64\% \\
-    FV + Cons + MM & +6, 33\% & +2, 28\% & +8, 54\% & +21.5, 52\% & +0.2, 30\% \\
-    FV + Bayes + MM & +2, 22\% & $-$6, 19\% & +2, 36\% & +12.7, 53\% & $-$17, 20\% \\
-    \bottomrule
-  \end{tabular}
-\end{table}
 
 \subsection{A 29-agent tournament}
 A duplicate tournament (\file{scripts/tournament.py}) draws four distinct agents per table and plays each deal under all four seat rotations, 16{,}000 games in total, with table-clustered 95\% CIs, win rate and Elo.
@@ -103,7 +87,7 @@ A no-information market maker that values every card at \$8.8 sits mid-table at 
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.85\textwidth]{midterm_results.pdf}
+  \includegraphics[width=0.75\textwidth]{midterm_results.pdf}
   \caption{Goal-suit accuracy over the game for seat 0, 3000 games, 5-fold CV. (a)~Q1: BayesianMM against Bayesian, PotMM and Fundamental. A logistic regression on the hand-only posterior plus public-trade features beats the hand-only posterior from the first trades on (\file{results/proposal\_revelation.json}). (b)~Q2: PPO-v2 at seat 0, linear probes of its current input and its GRU state (\file{results/probe\_ppo\_v2.json}). Chance is 25\%.}
   \label{fig:results}
 \end{figure}
@@ -112,12 +96,11 @@ A no-information market maker that values every card at \$8.8 sits mid-table at 
 We simulated 3000 games at one table (BayesianMM at seat 0 against Bayesian, PotMM and Fundamental) and every 20 ticks predicted seat 0's goal suit in two ways (\file{scripts/proposal\_figure.py}).
 The baseline is the exact posterior given only seat 0's dealt hand. The order-flow model is a logistic regression that adds each opponent's net purchases per suit, the largest net position, and the number and mean price of trades per suit.
 The trades help from the first 20 ticks on (Figure~\ref{fig:results}a). By tick 240 accuracy rises from 38.9\% to 54.0\% and log-loss falls from 1.88 to 1.54 bits, so $\Delta_{\text{rev}}(240)\approx 0.35$ bits (\file{results/proposal\_revelation.json}).
-This is a lower bound for one table of heuristic agents, since hand-crafted summaries discard the order and timing of trades and the quotes that did not trade.
+This is a lower bound for one table of heuristic agents, since the summaries discard the order and timing of trades.
 
 \subsection{Q2: a first linear probe of PPO-v2}
 We put PPO-v2 at seat 0 of the same table for 3000 games and recorded its input and its GRU state every 20 ticks (\file{scripts/probe\_ppo.py}). At each tick we fit 5-fold cross-validated logistic regressions on standardised features to predict the goal suit~\cite{probes}. The actor reads only the GRU state.
 The result is negative for this agent (Figure~\ref{fig:results}b). The GRU state is no more informative than the card-counting posterior among its inputs, 41.2\% at tick 239 against 42.9\% (hand only 38.9\%), yet a probe of the current input reaches 65.0\% and 1.27 bits (\file{results/probe\_ppo\_v2.json}).
-The agent does not keep this information in a linearly readable form, which fits an agent cloned from a baseline that uses only card counts.
 
 \subsection{Q2: PPO agents with memory of the trade flow}
 \label{sec:memory}
@@ -135,28 +118,31 @@ Every comparison the file does not list is exploratory, and no setting is adopte
 
 \begin{table}[h]
   \centering\scriptsize\setlength{\tabcolsep}{3pt}
-  \caption{Memory agents after 2000 updates. Probe at the PPO-v2 table (3000 games, 5-fold CV), profit over 1000 games per matchup. Each cell is the mean over seeds, [min--max] over seeds, and ($\pm$ mean per-run 95\% CI). Seed 2 is additional and not part of the pre-registered test, which uses seeds 0 and 1. Transformer seed 1 is pending. The hand-only posterior gives 38.9\%. Files: \file{runs/memory/<core>\_s<seed>/\{probe,eval\}.json}, table by \file{scripts/memory\_report.py}.}
+  \caption{Memory agents after 2000 updates. Probe at the PPO-v2 table (3000 games, 5-fold CV), profit over 1000 games per matchup. Each cell is the mean over seeds, [min--max] over seeds, and ($\pm$ mean per-run 95\% CI). Seed 2 is additional and not part of the pre-registered test, which uses seeds 0 and 1. Transformer seed 1 resumed at update 150 on another GPU after a memory kill, with the Adam state and self-play pool reset. The hand-only posterior gives 38.9\%. Files: \file{runs/memory*/<core>\_s<seed>/\{probe,eval\}.json}, table by \file{scripts/memory\_report.py}.}
   \label{tab:memory}
   \input{memory_table.tex}
 \end{table}
 
-Scored as sealed, on the mean of seeds 0 and 1 (\file{runs/memory/prereg/*.json}), the core without memory (54.0\%) and the GRU (47.1\%) fall inside their predicted ranges. The minGRU prediction (43--52\%) is a miss: we observed 58.0\%, and each seed (58.3\% and 57.7\%) lies above the range.
-Among these three the predicted order (none $>$ GRU $\approx$ minGRU) was wrong, and the observed order is minGRU $>$ none $>$ GRU.
-The minGRU meets the pre-registered criterion with two seeds, confounded by policy: it beats the no-memory core by 4.0 points, and its worse seed (57.7\%) beats the better no-memory seed (54.8\%).
-The confound is that every agent receives the same observation, yet the mean probe on the current input ranges from 60.1\% to 63.7\% across cores. Each agent is probed on games it played itself, so the probe numbers mix representation with policy, and a 4-point gap lies within that spread.
-We therefore do not claim that memory helps. The minGRU fails the profit criterion ($+12.8$ against $+14.9$ \$/game on seeds 0 and 1), and the GRU meets neither criterion.
-As additional evidence outside the pre-registered test, the third seed weakens the minGRU result: minGRU seed 2 reaches 53.5\%, below the better no-memory seed, and the three-seed means are 56.5\% against 53.4\%.
-The transformer is not a result yet. It is a single seed with a likely degenerate policy (about 1 lift per game against FV + Bayes + MM, against 5--6 for the other cores), under investigation, and we draw no conclusion from it until seed 1.
+The main finding is a negative control. We fed one common set of 3000 recorded games, those of the none s0 probe, through every network from a fresh state, including two untrained random-init networks per architecture (\file{runs/memory-diag/transformer\_s1/common\_probe.json}, exploratory).
+On these identical inputs the current input alone probes at 60.1\%, and the random-init networks at 60.0\% (none), 60.1\% (minGRU), 60.0\% (GRU) and 59.2\% (transformer). Every trained agent is at or below that: none 53.2/54.6\%, minGRU 53.1/55.3\%, GRU 44.3/44.3\% and transformer 45.2/45.2\% for seeds 0/1.
+Trained minus random-init is $-6.1$ points for none, $-5.9$ for minGRU, $-15.7$ for GRU and $-14.1$ for the transformer.
+So this probe measures how much of the input's goal-suit information a network passes through, not a belief it has learned, and the comparison between memory types cannot be read as memory helping belief. The pre-registered results below stand as scored, under that reading.
 
-Two exploratory observations stand out. The flow features alone go a long way, since the core without memory reaches 53.4\% over three seeds against 41.2\% for the PPO-v2 GRU.
-And no core's last hidden state is more informative than a probe of that agent's current input, so no memory core yet adds information the input lacks.
+Scored as sealed, on the mean of seeds 0 and 1 (\file{runs/memory/prereg/*.json}), the core without memory (54.0\%) and the GRU (47.1\%) fall inside their predicted ranges. The minGRU prediction (43--52\%) is a miss: we observed 58.0\%, and each seed (58.3\% and 57.7\%) lies above the range. The transformer prediction (48--58\%), the only fully blind one, is also a miss: we observed 44.8\% (45.6\% and 44.0\%).
+The predicted order (transformer $\geq$ none $>$ GRU $\approx$ minGRU) was wrong, and the observed order is minGRU $>$ none $>$ GRU $>$ transformer.
+The minGRU meets the pre-registered criterion with two seeds, confounded by policy: it beats the no-memory core by 4.0 points, and its worse seed (57.7\%) beats the better no-memory seed (54.8\%).
+Each agent is probed on games it played itself, and the probe on the identical observation ranges from 60.1\% to 65.1\% across runs, so a 4-point gap lies within the spread due to policy.
+We therefore do not claim that memory helps. The minGRU fails the profit criterion ($+12.8$ against $+14.9$ \$/game on seeds 0 and 1), and the GRU and the transformer meet neither criterion.
+As additional evidence outside the pre-registered test, the third seed weakens the minGRU result: minGRU seed 2 reaches 53.5\%, below the better no-memory seed, and the three-seed means are 56.5\% against 53.4\%.
+Both transformer seeds play a likely degenerate policy, lifting only 1--2 times per game against FV + Bayes + MM where the other cores lift 5--6 times, and at that table they have no edge: $-3.5\pm3.6$ \$/game (seed 0) and $-0.3\pm3.9$ \$/game with a 30.9\% win rate (seed 1).
+
 Runs gru\_s0 and none\_s0 were each interrupted three times early and resumed from a checkpoint, which reset the Adam state and the self-play pool.
 
 \section{Remaining plan}
 The poster is due in the week-15 session (21--27 Dec) and the final report by 8 Jan.
 \begin{itemize}
-  \item Memory agents (by 21 Nov). Transformer seed 1 is running, and seed 2 of the other three cores is done. Then the supervised sequence model for Q1 on the full trade history and several opponent populations (by 29 Nov).
-  \item Interpretability (30 Nov--13 Dec). First, probing every agent on one common set of trajectories (the same games fed through each network), which removes the policy confound above. Each memory core also gets a known-answer recall check, a fact shown only early in the game and probed at the end, to tell ``memory does not help'' apart from ``these agents cannot learn to use memory at this training length''. Then linear and MLP probes giving an extraction score $E_a$ from 0 (hand only) to 1 (as good as the Q1 model), steering along the probe direction~\cite{actadd} and ablation to price the belief in \$/game.
+  \item Memory agents (by 21 Nov). Seeds 0--1 of all four cores and seed 2 of three are done. Then the supervised sequence model for Q1 on the full trade history and several opponent populations (by 29 Nov).
+  \item Interpretability (30 Nov--13 Dec). First, replacing the probe above by a controlled one, pre-registered before it runs: the gain of each trained network over a random-init network of the same architecture on the same trajectories, and what its hidden state adds beyond the current input. Each memory core also gets a known-answer recall check, a fact shown only early in the game and probed at the end, to tell ``memory does not help'' apart from ``these agents cannot learn to use memory at this training length''. Then an extraction score $E_a$ from 0 (hand only) to 1 (as good as the Q1 model), steering along the probe direction~\cite{actadd} and ablation.
   \item Leakage and exploitability (7--20 Dec). A classifier per agent predicts its hand from its own actions, giving $L_a$ in bits. One PPO best response per agent (about 10 agents $\times$ 20\,M steps) gives $\hat\varepsilon_a$~\cite{timbers}, and we test the rank correlation of $L_a$ with $\hat\varepsilon_a$.
 \end{itemize}
 
