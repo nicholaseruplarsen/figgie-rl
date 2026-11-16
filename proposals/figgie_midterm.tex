@@ -98,7 +98,7 @@ After 300 updates (4.9\,M steps, one seed) PPO-v2 matches or beats every reporte
 
 \subsection{A 29-agent tournament}
 A duplicate tournament (\file{scripts/tournament.py}) draws four distinct agents per table and plays each deal under all four seat rotations, 16{,}000 games in total, with table-clustered 95\% CIs, win rate and Elo.
-In a second run without uniform-random agents (\file{results/tournament\_norandom.md}) no agent dominates. AdaptiveMM ($+22.2\pm2.4$ \$/game), BayesianMM ($+18.4$), Bayesian ($+16.1$) and PPO-v2 ($+15.5\pm2.2$) are statistically tied, and PPO-v2 has the highest win rate (44.7\%) and Elo (1574).
+In a second run without uniform-random agents (\file{results/tournament\_norandom.md}) AdaptiveMM ($+22.2\pm2.4$ \$/game) is more profitable than Bayesian ($+16.1\pm2.6$) and PPO-v2 ($+15.5\pm2.2$), whose intervals do not overlap its own, with BayesianMM ($+18.4\pm2.3$) in between. No agent dominates, since PPO-v2 has the highest win rate (44.7\%) and Elo (1574).
 A no-information market maker that values every card at \$8.8 sits mid-table at $+2.6$, and PotMM with its suit labels scrambled each game is last at $-48.4$, so goal-suit information is worth a great deal.
 
 \begin{figure}[t]
