@@ -82,23 +82,28 @@ def main():
     ap.add_argument("--ppo", nargs="*", default=[])
     ap.add_argument("--games", type=int, default=1000)
     ap.add_argument("--procs", type=int, default=8)
+    ap.add_argument("--skip-baselines", action="store_true", help="only the PPO matchups")
     ap.add_argument("--out", default=os.path.join(ROOT, "results/cs224r_eval.json"))
     a = ap.parse_args()
     OUT = {}
     with mp.Pool(a.procs) as pool:
         base = ["Bayesian", "FairValue", "MarketMaker", "Conservative"]
-        for n in (200, 2000):
+        for n in (() if a.skip_baselines else (200, 2000)):
             # fixed seats: no rotation (names list of length 4 but rot forced to 0 via g multiple of 4)
             res = pool.map(run, [(base, 4 * g, None) for g in range(n)])
             OUT[f"baseline tournament fixed seats, {n} games"] = summarize(res)
             print(json.dumps(OUT[f"baseline tournament fixed seats, {n} games"]), flush=True)
         for spec in a.ppo:
-            tag, ckpt = spec.split("=")
+            tag, ckpt = spec.split("=", 1)
             for m, opp in MATCHUPS.items():
                 res = pool.map(run, [(["PPO"] + opp, g, ckpt) for g in range(a.games)], chunksize=16)
                 OUT[f"{tag} {m}"] = summarize(res)
                 s = OUT[f"{tag} {m}"]["PPO@0"]
                 print(tag, m, json.dumps(s), flush=True)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from provenance import provenance, flag_exploratory
+    OUT["_provenance"] = provenance(script="scripts/eval_cs224r.py")
+    OUT = flag_exploratory(OUT)
     json.dump(OUT, open(a.out, "w"), indent=1)
 
 

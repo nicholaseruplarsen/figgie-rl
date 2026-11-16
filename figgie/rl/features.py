@@ -57,3 +57,44 @@ class Featurizer:
             if a is not None:
                 f[65 + s] = max(0.0, buy[s] - a[0]) / 10
         return f
+
+
+FLOW_DIM = OBS_DIM + 16
+
+
+class FlowFeaturizer(Featurizer):
+    """The 69 CS224R features plus who traded what since this player's last turn:
+
+      net buys per opponent (rotated, own seat excluded) x suit, /3 (12)
+      mean price of those trades per suit, /30 (4)                       = 85
+
+    The CS224R features only keep cumulative counts per suit, so a policy can
+    learn who is accumulating which suit only by integrating these over time.
+    """
+
+    def __init__(self, obs, r=2.0):
+        super().__init__(obs, r)
+        self.seen = 0
+
+    def __call__(self, obs) -> np.ndarray:
+        base = super().__call__(obs)
+        me, n = obs.me, obs.n
+        net = np.zeros((n, 4), np.float32)
+        px, cnt = np.zeros(4, np.float32), np.zeros(4, np.float32)
+        tr = obs.trades
+        for t in tr[self.seen:]:
+            net[t.buyer, t.suit] += 1
+            net[t.seller, t.suit] -= 1
+            px[t.suit] += t.price
+            cnt[t.suit] += 1
+        self.seen = len(tr)
+        opp = net[[(me + i) % n for i in range(1, n)]][:3]
+        f = np.zeros(FLOW_DIM, np.float32)
+        f[:OBS_DIM] = base
+        f[OBS_DIM:OBS_DIM + opp.size] = (opp / 3).ravel()
+        f[OBS_DIM + 12:] = np.where(cnt > 0, px / np.maximum(cnt, 1), 0) / 30
+        return f
+
+
+def make_featurizer(flow: bool):
+    return FlowFeaturizer if flow else Featurizer
