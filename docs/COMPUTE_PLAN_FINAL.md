@@ -29,8 +29,8 @@ Not measured cleanly: how one run scales past 2 env workers. The one data point 
 |---|---|---|---|
 | wsl2 CPU | 4 of 8 cores | $0 | Not available: Nicholas's rule since 15 Nov is no research or training on wsl2. |
 | compute-01 (free tier) | one job at a time, 4 GB RAM cap, 3090 when the owner isn't on it | $0 | GPU 1 was held by the owner again on 15 Nov. Quote on 16 Nov: our tenant can only borrow idle room. Good for small jobs, too slow for the long runs (see item 1). |
-| Vast, many-core box | 32 cores with any GPU | quoted $0.20/h (3090 box), $0.36/h (4090), $0.52/h (5090) | `compute quote --data-class public --vram 4 --ram 32 --cpus 32`, 16 Nov. The auto ranking picked these on GPU benchmark, but for us the cores are what count. |
-| Vast, single GPU | 1× 3090 / 4090 / 5090, 8 cores | quoted $0.33/h / $0.80/h / $1.17/h | `compute quote --data-class public --gpu <type> --cpus 8`, 16 Nov |
+| Vast, many-core box | 32 cores with any GPU | quoted $0.20/h (3090 box), $0.36/h (4090), $0.52/h (5090) | `compute quote --vram 4 --ram 32 --cpus 32`, 16 Nov. The auto ranking picked these on GPU benchmark, but for us the cores are what count. |
+| Vast, single GPU | 1× 3090 / 4090 / 5090, 8 cores | quoted $0.33/h / $0.80/h / $1.17/h | `compute quote --gpu <type> --cpus 8`, 16 Nov |
 
 Andrew's warning: real Vast bills have run about 3× the quote (open bug T-5004, 3090 quoted $0.095/h and billed $0.29–0.31/h). Below, "quoted" uses the quote and "billed" uses 3× it.
 
