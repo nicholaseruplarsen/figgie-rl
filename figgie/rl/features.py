@@ -96,5 +96,34 @@ class FlowFeaturizer(Featurizer):
         return f
 
 
-def make_featurizer(flow: bool):
+RECALL_DIM = FLOW_DIM + 4
+
+
+class RecallFeaturizer(FlowFeaturizer):
+    """Known-answer recall check (docs/research_plan.tex, E0): the flow features plus a 4-dim cue,
+    the one-hot goal suit, shown only at this player's first decision of the game and zero after.
+    Not a real Figgie observation: the cue is read from the hidden game state on purpose, so a
+    probe at the last tick can only find the goal suit beyond the input if the core kept it."""
+
+    def __init__(self, obs, r=2.0):
+        super().__init__(obs, r)
+        self.cued = False
+
+    def __call__(self, obs) -> np.ndarray:
+        f = np.zeros(RECALL_DIM, np.float32)
+        f[:FLOW_DIM] = super().__call__(obs)
+        if not self.cued:
+            f[FLOW_DIM + obs.game.goal] = 1.0
+            self.cued = True
+        return f
+
+
+def make_featurizer(flow):
+    """flow: False (69 dims), True (85, trade flow) or "recall" (89, flow + early goal cue)."""
+    if flow == "recall":
+        return RecallFeaturizer
     return FlowFeaturizer if flow else Featurizer
+
+
+def obs_dim(flow):
+    return RECALL_DIM if flow == "recall" else FLOW_DIM if flow else OBS_DIM
