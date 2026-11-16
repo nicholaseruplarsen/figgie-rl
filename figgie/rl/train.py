@@ -29,7 +29,7 @@ from ..actions import encode, legal_mask, LIFT
 from ..agents import cs224r as C
 from ..engine import play
 from .vec import VecEnv
-from .features import FLOW_DIM, OBS_DIM, make_featurizer
+from .features import FLOW_DIM, OBS_DIM, RECALL_DIM, make_featurizer, obs_dim
 from .policy import ActorCritic, PolicyAgent, load_net, save
 
 BASELINES = [C.RandomAgent, C.FairValue, C.Conservative, C.MarketMaker, C.Bayesian]
@@ -103,7 +103,24 @@ def bc(args):
 
 
 def new_net(args):
-    return ActorCritic(args.arch, obs_dim=FLOW_DIM if args.flow else OBS_DIM, window=args.window)
+    return ActorCritic(args.arch, obs_dim=obs_dim(feat_kind(args)), window=args.window)
+
+
+def feat_kind(args):
+    return "recall" if getattr(args, "recall", False) else args.flow
+
+
+def pad_input(net, d):
+    """A flow-feature net (BC init) widened to d inputs with zero weights on the new ones (the recall cue)."""
+    w = net.enc[0].weight.data
+    if w.shape[1] == d:
+        return net
+    cfg = dict(net.config, obs_dim=d)
+    new = ActorCritic(**cfg)
+    sd = net.state_dict()
+    sd["enc.0.weight"] = torch.cat([w, torch.zeros(w.shape[0], d - w.shape[1])], 1)
+    new.load_state_dict(sd)
+    return new.eval()
 
 
 # ---------------------------------------------------------------- PFSP
@@ -169,7 +186,9 @@ def ppo(args):
         print(json.dumps(dict(resumed_from=first)), flush=True)
     else:
         net = load_net(args.init) if args.init else new_net(args)
-    assert net.arch == args.arch and net.config["obs_dim"] == (FLOW_DIM if args.flow else OBS_DIM), net.config
+        if feat_kind(args) == "recall":
+            net = pad_input(net, RECALL_DIM)
+    assert net.arch == args.arch and net.config["obs_dim"] == obs_dim(feat_kind(args)), net.config
     net = net.to(dev)
     if args.opt == "adam":                      # the recipe so far (PPO-v2 and the memory runs)
         opt = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
@@ -181,7 +200,7 @@ def ppo(args):
         print(json.dumps(dict(optimizer=args.opt, split=[(r["name"], r["group"]) for r in split])), flush=True)
     pool = Pool(p_sp=args.p_sp, net_config=net.config)
     venv = VecEnv(args.envs, args.procs, args.seed,
-                  dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha, flow=args.flow),
+                  dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha, flow=feat_kind(args)),
                   dict(p_sp=args.p_sp, net_config=net.config), start=args.mp_start)
     B, T, D = args.envs, args.steps, net.config["obs_dim"]
     Xc, Mc = venv.reset()
@@ -276,6 +295,7 @@ def main():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--arch", choices=["none", "mingru", "gru", "transformer"], default="gru")
     p.add_argument("--flow", action="store_true", help="85-dim observation with per-opponent trade flow")
+    p.add_argument("--recall", action="store_true", help="recall check: --flow plus a goal-suit cue at the first decision only (89 dims)")
     p.add_argument("--window", type=int, default=128, help="transformer context in ticks")
     p.add_argument("--device", default="cpu")
     p.add_argument("--resume", action="store_true", help="continue from OUT/latest.pt if present")

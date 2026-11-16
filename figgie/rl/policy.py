@@ -19,7 +19,7 @@ import torch
 import torch.nn as nn
 
 from ..actions import N_ACTIONS, decode, legal_mask
-from .features import FLOW_DIM, OBS_DIM, make_featurizer
+from .features import FLOW_DIM, OBS_DIM, RECALL_DIM, make_featurizer
 
 H = 128
 ARCHS = ("none", "mingru", "gru", "transformer")
@@ -174,7 +174,8 @@ class PolicyAgent:
     def __init__(self, net, deterministic=True, name="PPO", seed=None):
         self.net, self.det, self.name = net, deterministic, name
         self.gen = torch.Generator().manual_seed(seed or 0)
-        self.flow = net.config["obs_dim"] == FLOW_DIM
+        d = net.config["obs_dim"]
+        self.flow = "recall" if d == RECALL_DIM else d == FLOW_DIM
 
     def reset(self, obs):
         self.feat = make_featurizer(self.flow)(obs)
