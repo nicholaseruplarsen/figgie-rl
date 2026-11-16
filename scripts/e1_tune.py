@@ -35,7 +35,7 @@ FLAGS = dict(learning_rate="--lr", ent_coef="--ent", clip_coef="--clip", gae_lam
 
 
 def train_cmd(a, t, d):
-    upd = t["cost_steps"] // a.steps_per_update
+    upd = int(round(t["cost_steps"] / a.steps_per_update))
     cmd = [sys.executable, "-m", "figgie.rl.train", "ppo", "--arch", a.core, "--flow", "--seed", str(a.train_seed),
            "--device", "cpu", "--init", a.init, "--lift-alpha", "0.1", "--updates", str(upd),
            "--procs", "2", "--threads", "1", "--out", d, "--opt", a.opt, "--iig-path", a.iig]
@@ -118,7 +118,7 @@ def main():
         log.write(json.dumps(row) + "\n"); log.flush()
 
     def used():
-        return sum(t["cost_steps"] for t in done) + sum(t["cost_steps"] for t in running.values())
+        return sum(t["cost_steps"] for t in done) + sum(r["trial"]["cost_steps"] for r in running.values())
 
     running = {}                                     # pid -> trial
     while True:
@@ -194,7 +194,7 @@ def main():
                complete=bool(steps >= a.budget),
                n_trials=len(done), n_ok=len(ok), lengths_updates=lengths,
                best=dict(id=best["id"], score=best["score"], ci95=best.get("score_ci95"), params=best["params"],
-                         exponents=best["exponents"], updates=best["cost_steps"] // a.steps_per_update) if best else None,
+                         exponents=best["exponents"], updates=int(round(best["cost_steps"] / a.steps_per_update))) if best else None,
                anytime=at, curve=[dict(steps=s, best=b, id=i) for s, b, i in curve], stabilise_share=stab,
                core_h=round(sum((t.get("train_cpu_s") or 0) + (t.get("eval_cpu_s") or 0) for t in done) / 3600, 3),
                smoke=smoke, evaluator=ev, _provenance=prov)
