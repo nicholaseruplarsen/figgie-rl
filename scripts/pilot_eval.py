@@ -15,10 +15,11 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--games", type=int, default=500)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--game-offset", type=int, default=0, help="first game seed (E2 uses fresh games: 100000)")
     a = ap.parse_args()
-    res = [run((["PPO", "FairValue", "Bayesian", "MarketMaker"], g, a.ckpt)) for g in range(a.games)]
+    res = [run((["PPO", "FairValue", "Bayesian", "MarketMaker"], g, a.ckpt)) for g in range(a.game_offset, a.game_offset + a.games)]
     p = [r["PPO@0"][0] for r in res]
-    out = dict(profit=round(st.mean(p), 2), ci95=round(1.96 * st.stdev(p) / len(p) ** .5, 2), games=len(p),
+    out = dict(profit=round(st.mean(p), 2), ci95=round(1.96 * st.stdev(p) / len(p) ** .5, 2), games=len(p), game_offset=a.game_offset,
                matchup="vs FV + Bayes + MM")
     json.dump(out, open(a.out, "w"))
 
