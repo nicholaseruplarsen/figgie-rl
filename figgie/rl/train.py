@@ -15,7 +15,6 @@ BC lr 1e-3, PFSP EMA rate 0.1, heuristic pool = the five baselines uniformly.
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import os
 import random
@@ -29,8 +28,8 @@ from ..actions import encode, legal_mask, LIFT
 from ..agents import cs224r as C
 from ..engine import play
 from .vec import VecEnv
-from .features import Featurizer
-from .policy import ActorCriticRecurrent, PolicyAgent, H
+from .features import FLOW_DIM, OBS_DIM, make_featurizer
+from .policy import ActorCritic, PolicyAgent, load_net, save
 
 BASELINES = [C.RandomAgent, C.FairValue, C.Conservative, C.MarketMaker, C.Bayesian]
 LIFT_IDS = set(range(249, 253))
@@ -38,12 +37,13 @@ LIFT_IDS = set(range(249, 253))
 
 # ---------------------------------------------------------------- BC
 class Recorder:
-    def __init__(self, teacher):
+    def __init__(self, teacher, flow=False):
         self.t, self.name = teacher, teacher.name
+        self.Feat = make_featurizer(flow)
 
     def reset(self, obs):
         self.t.reset(obs)
-        self.f = Featurizer(obs)
+        self.f = self.Feat(obs)
         self.X, self.M, self.A = [], [], []
 
     def act(self, obs):
@@ -59,11 +59,13 @@ def bc(args):
     rng = random.Random(args.seed)
     eps = []
     for e in range(args.episodes):
-        rec = Recorder(C.Bayesian(seed=rng.getrandbits(32)))
+        rec = Recorder(C.Bayesian(seed=rng.getrandbits(32)), args.flow)
         opps = [rng.choice(BASELINES)(seed=rng.getrandbits(32)) for _ in range(3)]
         play([rec] + opps, seed=rng.getrandbits(48))
         eps.append((np.stack(rec.X), np.stack(rec.M), np.array(rec.A)))
-    net = ActorCriticRecurrent()
+    torch.manual_seed(args.seed)
+    dev = torch.device(args.device)
+    net = new_net(args).to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=args.lr)
     log = []
     for ep in range(args.epochs):
@@ -71,11 +73,11 @@ def bc(args):
         tot = n = lift_hit = lift_n = top1 = 0
         for i in range(0, len(eps), args.batch):
             chunk = eps[i:i + args.batch]
-            X = torch.tensor(np.stack([c[0] for c in chunk]).swapaxes(0, 1))
-            M = torch.tensor(np.stack([c[1] for c in chunk]).swapaxes(0, 1))
-            A = torch.tensor(np.stack([c[2] for c in chunk]).swapaxes(0, 1))
-            done = torch.zeros(X.shape[:2])
-            logits, _, _ = net.unroll(X, torch.zeros(X.shape[1], H), M, done)
+            X = torch.tensor(np.stack([c[0] for c in chunk]).swapaxes(0, 1), device=dev)
+            M = torch.tensor(np.stack([c[1] for c in chunk]).swapaxes(0, 1), device=dev)
+            A = torch.tensor(np.stack([c[2] for c in chunk]).swapaxes(0, 1), device=dev)
+            done = torch.zeros(X.shape[:2], device=dev)
+            logits, _, _ = net.unroll(X, net.init_state(X.shape[1], dev), M, done)
             legal = M.gather(-1, A.unsqueeze(-1)).squeeze(-1).float()
             w = torch.where((A >= 249) & (A < 253), args.lift_weight, 1.0) * legal
             nll = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), A.reshape(-1), reduction="none")
@@ -95,19 +97,24 @@ def bc(args):
         log.append(row)
         print(json.dumps(row), flush=True)
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    torch.save(net.state_dict(), args.out)
+    save(net.cpu(), args.out)
     json.dump(log, open(args.out + ".log.json", "w"), indent=1)
+
+
+def new_net(args):
+    return ActorCritic(args.arch, obs_dim=FLOW_DIM if args.flow else OBS_DIM, window=args.window)
 
 
 # ---------------------------------------------------------------- PFSP
 class Pool:
-    def __init__(self, size=16, q=2.0, p_sp=0.3, ema=0.1):
+    def __init__(self, size=16, q=2.0, p_sp=0.3, ema=0.1, net_config=None):
         self.size, self.q, self.p_sp, self.ema = size, q, p_sp, ema
+        self.net_config = net_config or dict(arch="gru")
         self.members = []   # [id, state_dict, winrate]
         self.next_id = 0
 
     def add(self, net):
-        self.members.append([self.next_id, copy.deepcopy(net.state_dict()), 0.5])
+        self.members.append([self.next_id, {k: v.detach().cpu().clone() for k, v in net.state_dict().items()}, 0.5])
         self.next_id += 1
         if len(self.members) > self.size:
             self.members.pop(0)
@@ -119,7 +126,7 @@ class Pool:
                 if self.members and rng.random() < self.p_sp:
                     w = [(1 - m[2]) ** self.q + 1e-6 for m in self.members]
                     m = rng.choices(self.members, weights=w)[0]
-                    net = ActorCriticRecurrent()
+                    net = ActorCritic(**self.net_config)
                     net.load_state_dict(m[1])
                     net.eval()
                     opps.append(PolicyAgent(net, deterministic=False, seed=rng.getrandbits(31)))
@@ -145,50 +152,68 @@ class Pool:
 def ppo(args):
     torch.manual_seed(args.seed)
     torch.set_num_threads(args.threads)
-    net = ActorCriticRecurrent()
-    if args.init:
-        net.load_state_dict(torch.load(args.init, weights_only=True))
+    dev = torch.device(args.device)
+    if dev.type == "cuda" and dev.index is None:
+        dev = torch.device("cuda", torch.cuda.current_device())
+    if dev.type == "cuda" and args.max_vram_gb:
+        total = torch.cuda.get_device_properties(dev).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, args.max_vram_gb * 2**30 / total), dev)
+    first = 0
+    latest = os.path.join(args.out, "latest.pt")
+    if args.resume and os.path.exists(latest):
+        # Resume weights only: the Adam state and the PFSP pool start afresh.
+        first = torch.load(latest, map_location="cpu", weights_only=True).get("update") or args.start_update
+        assert first, "latest.pt has no update number, pass --start-update"
+        net = load_net(latest)
+        print(json.dumps(dict(resumed_from=first)), flush=True)
+    else:
+        net = load_net(args.init) if args.init else new_net(args)
+    assert net.arch == args.arch and net.config["obs_dim"] == (FLOW_DIM if args.flow else OBS_DIM), net.config
+    net = net.to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
-    pool = Pool(p_sp=args.p_sp)
+    pool = Pool(p_sp=args.p_sp, net_config=net.config)
     venv = VecEnv(args.envs, args.procs, args.seed,
-                  dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha), dict(p_sp=args.p_sp))
-    B, T = args.envs, args.steps
+                  dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha, flow=args.flow),
+                  dict(p_sp=args.p_sp, net_config=net.config), start=args.mp_start)
+    B, T, D = args.envs, args.steps, net.config["obs_dim"]
     Xc, Mc = venv.reset()
-    h = torch.zeros(B, H)
-    start = torch.ones(B)
+    h = net.init_state(B, dev)
+    start = torch.ones(B, device=dev)
     os.makedirs(args.out, exist_ok=True)
     logf = open(os.path.join(args.out, "train_log.jsonl"), "a")
-    for upd in range(1, args.updates + 1):
+    for upd in range(first + 1, args.updates + 1):
         t0 = time.time()
-        Xs = torch.zeros(T, B, 69)
-        Ms = torch.zeros(T, B, 257, dtype=torch.bool)
-        As = torch.zeros(T, B, dtype=torch.long)
-        LPs, Vs, Rs = torch.zeros(T, B), torch.zeros(T, B), torch.zeros(T, B)
-        Ds = torch.zeros(T, B)
-        Hs = torch.zeros(T, B, H)
+        Xs = torch.zeros(T, B, D, device=dev)
+        Ms = torch.zeros(T, B, 257, dtype=torch.bool, device=dev)
+        As = torch.zeros(T, B, dtype=torch.long, device=dev)
+        LPs, Vs, Rs = (torch.zeros(T, B, device=dev) for _ in range(3))
+        Ds = torch.zeros(T, B, device=dev)
+        Hs = {}                         # recurrent state at each chunk start
         infos = []
         venv.sync(pool)
         net.eval()
         with torch.no_grad():
             for t in range(T):
-                X, M = torch.from_numpy(Xc), torch.from_numpy(Mc)
+                X, M = torch.from_numpy(Xc).to(dev), torch.from_numpy(Mc).to(dev)
                 h = h * (1 - start).unsqueeze(-1)
-                Hs[t], Ds[t] = h, start
+                Ds[t] = start
+                if t % args.chunk == 0:
+                    Hs[t] = h
                 logits, v, h = net.step(X, h, M)
                 dist = torch.distributions.Categorical(logits=logits)
                 a = dist.sample()
                 Xs[t], Ms[t], As[t], LPs[t], Vs[t] = X, M, a, dist.log_prob(a), v
-                Xc, Mc, R, D, new = venv.step(a.numpy())
-                Rs[t] = torch.from_numpy(R)
-                start = torch.from_numpy(D.astype(np.float32))
+                Xc, Mc, R, Dn, new = venv.step(a.cpu().numpy())
+                Rs[t] = torch.from_numpy(R).to(dev)
+                start = torch.from_numpy(Dn.astype(np.float32)).to(dev)
                 for info in new:
                     infos.append(info)
                     pool.record(info)
-            Xl, Ml = torch.from_numpy(Xc), torch.from_numpy(Mc)
+            Xl, Ml = torch.from_numpy(Xc).to(dev), torch.from_numpy(Mc).to(dev)
             _, v_last, _ = net.step(Xl, h * (1 - start).unsqueeze(-1), Ml)
         # GAE; Ds[t+1]==1 means step t ended its episode.
-        adv = torch.zeros(T, B)
-        last = torch.zeros(B)
+        adv = torch.zeros(T, B, device=dev)
+        last = torch.zeros(B, device=dev)
         for t in reversed(range(T)):
             nonterm = 1 - (Ds[t + 1] if t + 1 < T else start)
             nv = Vs[t + 1] if t + 1 < T else v_last
@@ -231,8 +256,8 @@ def ppo(args):
         logf.write(json.dumps(row) + "\n")
         logf.flush()
         if upd % 25 == 0 or upd == args.updates:
-            torch.save(net.state_dict(), os.path.join(args.out, f"update_{upd}.pt"))
-    torch.save(net.state_dict(), os.path.join(args.out, "final.pt"))
+            save(net, latest, update=upd)     # one rolling checkpoint keeps disk use small
+    save(net, os.path.join(args.out, "final.pt"))
     venv.close()
 
 
@@ -241,6 +266,13 @@ def main():
     p.add_argument("mode", choices=["bc", "ppo"])
     p.add_argument("--out", required=True)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--arch", choices=["none", "mingru", "gru", "transformer"], default="gru")
+    p.add_argument("--flow", action="store_true", help="85-dim observation with per-opponent trade flow")
+    p.add_argument("--window", type=int, default=128, help="transformer context in ticks")
+    p.add_argument("--device", default="cpu")
+    p.add_argument("--resume", action="store_true", help="continue from OUT/latest.pt if present")
+    p.add_argument("--start-update", type=int, default=0, help="update number of a latest.pt saved without one")
+    p.add_argument("--max-vram-gb", type=float, default=0, help="cap on this process's CUDA allocations")
     # BC
     p.add_argument("--episodes", type=int, default=500)
     p.add_argument("--lift-weight", type=float, default=15.0)
@@ -266,6 +298,8 @@ def main():
     p.add_argument("--snap-every", type=int, default=20)
     p.add_argument("--threads", type=int, default=4)
     p.add_argument("--procs", type=int, default=4, help="env worker processes")
+    p.add_argument("--mp-start", default="fork", choices=["fork", "spawn", "forkserver"],
+                   help="how env workers are started, spawn avoids inheriting the learner's memory")
     a = p.parse_args()
     if a.mode == "bc":
         a.epochs, a.lr = a.epochs or 10, a.lr or 1e-3
