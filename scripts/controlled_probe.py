@@ -132,8 +132,9 @@ def main():
         g.pop("_dc")
     res["groups"] = groups
     res["seconds"] = round(time.time() - t0, 1)
-    from provenance import provenance
+    from provenance import flag_exploratory, provenance
     res["_provenance"] = provenance(script="scripts/controlled_probe.py")
+    res = flag_exploratory(res)             # COMPUTE_EXPLORATORY=1 (E0, smoke): never scored
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(res, indent=1))
     print(json.dumps({k: res[k] for k in ("acc_input", "placebo", "memory") if k in res}), flush=True)
