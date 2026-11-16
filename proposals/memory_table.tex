@@ -1,0 +1,12 @@
+  \begin{tabular}{@{}lrllll@{}}
+    \toprule
+    & & \multicolumn{2}{c}{Goal-suit probe accuracy (\%), tick 239} & \multicolumn{2}{c}{Profit (\$/game)} \\
+    \cmidrule(lr){3-4}\cmidrule(l){5-6}
+    Memory core & Seeds & Last hidden state & Current input & FV+Cons+MM & FV+Bayes+MM \\
+    \midrule
+    none & 3 & 53.4 [52.2--54.8] ($\pm$1.8) & 61.3 [60.3--62.6] ($\pm$1.7) & +21.8 [+20.3--+23.9] ($\pm$4.2) & +14.6 [+14.0--+15.3] ($\pm$4.3) \\
+    minGRU & 3 & 56.5 [53.5--58.3] ($\pm$1.8) & 62.3 [61.6--62.8] ($\pm$1.7) & +21.5 [+21.4--+21.5] ($\pm$4.3) & +12.1 [+10.2--+15.3] ($\pm$4.3) \\
+    GRU & 3 & 47.0 [46.7--47.2] ($\pm$1.8) & 63.7 [61.8--65.1] ($\pm$1.7) & +19.2 [+17.8--+20.7] ($\pm$4.2) & +11.5 [+9.0--+13.1] ($\pm$4.6) \\
+    transformer & 1 & 45.6 ($\pm$1.8) & 60.1 ($\pm$1.8) & +5.8 ($\pm$3.6) & $-$3.5 ($\pm$3.6) \\
+    \bottomrule
+  \end{tabular}
