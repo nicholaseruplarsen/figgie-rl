@@ -105,6 +105,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--ncpu", type=int, required=True)
     ap.add_argument("--rounds", type=int, default=2)
+    ap.add_argument("--batch", type=int, default=0, help="concurrent trials (0: (ncpu-2)//3)")
     ap.add_argument("--fids", default="250,500,1000", help="trial lengths in updates, cycled")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--max-hours", type=float, default=4.0, help="start no round that would end after this")
@@ -118,7 +119,7 @@ def main():
                                                                     "--warmup", "1", "--snap-every", "1"], 8, [2], 1, 2, 2
     else:
         fids, extra, games, scal, rounds, batch, scal_upd = [int(x) for x in a.fids.split(",")], [], 500, [2, 4, 8], a.rounds, \
-            max(1, (a.ncpu - 2) // 3), 30
+            a.batch or max(1, (a.ncpu - 2) // 3), 30
     steps_per_update = (4 * 64) if smoke else STEPS_PER_UPDATE
     log = open(os.path.join(a.out, "trials.jsonl"), "a")
 
