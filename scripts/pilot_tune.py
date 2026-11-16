@@ -6,7 +6,7 @@ Exploratory: it measures core-hours per trial, not which configuration wins. It 
 Phase A, worker scaling: one PPO run (none core, flow features, BC init) for a few updates at
 2, 4 and 8 env workers, one at a time on an otherwise idle box.
 Phase B, tuning: rounds of concurrent trials proposed by a PROTEIN-style stub (cost-aware: each
-trial draws its own length from FIDELITIES, and after round 1 a Gaussian process over
+trial draws its own length from --fids, and after round 1 a Gaussian process over
 (log hyperparameters, log length) picks candidates by upper confidence bound per unit cost,
 sampled around the best trials). Each trial is train + a seat-rotated eval against
 FV + Bayes + MM. CPU time is read from wait4's rusage, which includes the env workers.
@@ -104,7 +104,8 @@ def main():
     ap.add_argument("--init", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--ncpu", type=int, required=True)
-    ap.add_argument("--rounds", type=int, default=3)
+    ap.add_argument("--rounds", type=int, default=2)
+    ap.add_argument("--fids", default="250,500,1000", help="trial lengths in updates, cycled")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--max-hours", type=float, default=4.0, help="start no round that would end after this")
     a = ap.parse_args()
@@ -116,7 +117,7 @@ def main():
         fids, extra, games, scal, rounds, batch, scal_upd = [2, 3], ["--envs", "4", "--steps", "64",
                                                                     "--warmup", "1", "--snap-every", "1"], 8, [2], 1, 2, 2
     else:
-        fids, extra, games, scal, rounds, batch, scal_upd = [125, 250, 500], [], 500, [2, 4, 8], a.rounds, \
+        fids, extra, games, scal, rounds, batch, scal_upd = [int(x) for x in a.fids.split(",")], [], 500, [2, 4, 8], a.rounds, \
             max(1, (a.ncpu - 2) // 3), 30
     steps_per_update = (4 * 64) if smoke else STEPS_PER_UPDATE
     log = open(os.path.join(a.out, "trials.jsonl"), "a")
