@@ -34,7 +34,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common_probe import last_hidden, record_chunk  # noqa: E402
 from probe_ppo import probe  # noqa: E402
 
-EVALUATOR = "scripts/controlled_probe.py v1"
 
 
 def correct(p, y):
@@ -105,13 +104,16 @@ def main():
         assert all(t["arch"] == arch for t in ts), f"group {g} mixes archs"
         dc = np.mean([t["c_cond"] for t in ts], 0) - c_in          # per game, seeds averaged
         acc_h = float(np.mean([t["c_h"].mean() for t in ts]))
-        groups[g] = dict(arch=arch, n_seeds=len(ts), acc_h=pts(acc_h),
+        groups[g] = dict(arch=arch, n_seeds=len(ts), evaluator=None, acc_h=pts(acc_h),
                          acc_cond=pts(np.mean([t["c_cond"].mean() for t in ts])),
                          delta_cond=pts(dc.mean()), delta_cond_ci90=[pts(v) for v in boot_ci(dc, a.boot)],
                          delta_rand=pts(acc_h - rand[arch]["acc"]),
                          delta_cond_seeds=[pts(t["c_cond"].mean() - c_in.mean()) for t in ts])
         groups[g]["_dc"] = dc
 
+    from provenance import flag_exploratory, provenance
+    prov = provenance(script="scripts/controlled_probe.py")
+    EVALUATOR = f"controlled_probe@{prov['code_commit'][:12]}"   # the evaluator commit the predictions name
     res = dict(evaluator=EVALUATOR, record=a.record, n_games=len(games), decisions=lens.pop(),
                acc_input=pts(c_in.mean()), random_init={k: dict(acc_seeds=[pts(x) for x in v["acc_seeds"]],
                                                                  acc=pts(v["acc"])) for k, v in rand.items()})
@@ -130,10 +132,10 @@ def main():
                              evaluator=EVALUATOR)
     for g in groups.values():
         g.pop("_dc")
+        g["evaluator"] = EVALUATOR
     res["groups"] = groups
     res["seconds"] = round(time.time() - t0, 1)
-    from provenance import flag_exploratory, provenance
-    res["_provenance"] = provenance(script="scripts/controlled_probe.py")
+    res["_provenance"] = prov
     res = flag_exploratory(res)             # COMPUTE_EXPLORATORY=1 (E0, smoke): never scored
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(res, indent=1))
