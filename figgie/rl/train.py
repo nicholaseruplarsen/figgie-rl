@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import random
+import sys
 import time
 
 import numpy as np
@@ -170,7 +171,14 @@ def ppo(args):
         net = load_net(args.init) if args.init else new_net(args)
     assert net.arch == args.arch and net.config["obs_dim"] == (FLOW_DIM if args.flow else OBS_DIM), net.config
     net = net.to(dev)
-    opt = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
+    if args.opt == "adam":                      # the recipe so far (PPO-v2 and the memory runs)
+        opt = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
+    else:                                       # shared tsinghua-rl iig/tune factory (E1/E2 arms)
+        if args.iig_path:
+            sys.path.insert(0, args.iig_path)
+        from iig.tune.optim import make_optimizer
+        opt, split = make_optimizer(net, args.opt, args.lr, eps=1e-5)
+        print(json.dumps(dict(optimizer=args.opt, split=[(r["name"], r["group"]) for r in split])), flush=True)
     pool = Pool(p_sp=args.p_sp, net_config=net.config)
     venv = VecEnv(args.envs, args.procs, args.seed,
                   dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha, flow=args.flow),
@@ -291,6 +299,9 @@ def main():
     p.add_argument("--clip", type=float, default=0.2)
     p.add_argument("--ent", type=float, default=0.01)
     p.add_argument("--vf", type=float, default=0.5)
+    p.add_argument("--opt", choices=["adam", "adamw", "muon"], default="adam",
+                   help="adam: the old recipe; adamw/muon: tsinghua-rl iig/tune make_optimizer")
+    p.add_argument("--iig-path", default=os.environ.get("IIG_PATH"), help="dir holding tsinghua-rl's iig/ package")
     p.add_argument("--max-grad-norm", type=float, default=0.5, help="PPO gradient clip (shared iig/tune core space)")
     p.add_argument("--beta", type=float, default=0.5)
     p.add_argument("--lift-alpha", type=float, default=0.0)
