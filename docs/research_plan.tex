@@ -2,7 +2,7 @@
 \usepackage[a4paper,top=1.0cm,bottom=0.9cm,left=1.4cm,right=1.4cm]{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{booktabs,enumitem,microtype,hyperref}
+\usepackage{booktabs,enumitem,microtype,hyperref,amsmath}
 \usepackage{titlesec,multicol}
 \titlespacing*{\section}{0pt}{4pt}{1pt}
 \titleformat*{\section}{\normalsize\bfseries}
@@ -11,90 +11,70 @@
 \newcommand{\file}[1]{{\small\texttt{#1}}}
 \pagestyle{empty}
 \begin{document}
-{\large\bfseries Research plan: does the ranking of game-solving RL methods survive stronger tuning, from small exact games to a large market?}\\[1pt]
-{\small Figgie half of the joint study with the tsinghua-rl IIG project (Rich), reviewed by him. Written 16 Nov 2026. Course 80245013, final report due 8 Jan 2027. Nothing here has been launched.}
+{\large\bfseries Research plan (reduced): do tuner and optimizer effects carry from small exact games to a large market, and does memory survive tuning?}\\[1pt]
+{\small Figgie half of the joint study with the tsinghua-rl IIG project (Rich), reviewed by him. Revised 16 Nov 2026 for a \$18 budget (Nicholas: ``\$100 tops for all Tsinghua projects combined''). Course 80245013, final report 8 Jan 2027. Pilot runs are exploratory and outside every comparison.}
 
-\section{The question, and why this one}
-\emph{When random search, CARBS or PROTEIN tune PPO and MMD, with AdamW or Muon, do the rankings of algorithms and memory architectures measured under a default recipe survive, and does the tuning budget a fair ranking needs on small exact-exploitability games carry over to a 4-player hidden-information market (Figgie)?}
+\section{The question}
+\emph{Do the effects of a strong tuner (PROTEIN vs random search) and an optimizer (Muon vs AdamW) on PPO, measured with exact exploitability on small games, carry over to a 4-player hidden-information market (Figgie)? And once a probe is controlled for what untrained nets already read, does a memory core (minGRU) hold more goal-suit belief than no memory, after both are tuned?}
 
-We recommend the merge of options (a) and (b), with Figgie as the large-game half. The Figgie memory result alone is too thin to publish: the minGRU gain (58.0\% vs 54.0\% probe, 2 seeds) shrank to 56.5\% vs 53.4\% with seed 2 and is confounded by policy, since each agent is probed on its own games. Rankings at one hand-picked recipe are what Rudolph et al.~\cite{rudolph} warn about, and Rich's re-tuning confirms it on our stack (PTTT, 10 fresh seeds: published MMD 0.171 and PPO 0.168 against re-tuned 0.130 and 0.126, $p=0.0005$, and the tuned methods are not separable, Holm $p=0.21$/$0.43$). Rich runs the factorial (random search, CARBS, PROTEIN $\times$ AdamW, Muon) on Kuhn, Leduc and Rudolph's games with exact exploitability and a CFR+ floor. We run the same factorial on Figgie, where exact exploitability is out of reach, and add the axis Figgie alone can test: memory architecture, scored against an exact Bayesian belief.
+Why this one. Rich's re-tuning showed tuning moves results more than the algorithm on our stack (PTTT, 10 fresh seeds: published MMD 0.171 and PPO 0.168, re-tuned 0.130 and 0.126, $p=0.0005$), as Rudolph et al.~\cite{rudolph} found. The Figgie memory result is too thin to publish alone. On common trajectories, untrained random-init nets of every core probe at 58.9--60.4\%, the same as the input (60.1\%), and every trained net is lower (none 53.2/54.6, minGRU 53.1/55.3, GRU and transformer 44--45). So our probe has measured input features, not belief (post-mortem of \#699, \file{docs/POSTMORTEM\_699.md}). The merge keeps one code path for both halves and fits the budget.
+What the Figgie half does not test: Rudolph's algorithm ranking. Only PPO is left on Figgie, so the ranking claim rests on Rich's half.
 
-\section{Rival hypotheses, and what would be new}
-H0, tuning dominates: after strong tuning the arms (PPO vs MMD, none vs minGRU vs GRU) tie within noise, Rudolph's result extended to a large game.
-H1, rankings are stable: tuning lifts every arm about equally, so the default-recipe ranking predicts the tuned one.
-H2, rankings flip: arms differ in tuning sensitivity~\cite{adkins}, so the winner depends on budget. Memory cores, with more interacting hyperparameters, gain most, and the midterm's ``memory does not clearly help'' is a tuning artefact.
-H3, the optimizer matters: Muon's orthogonalised updates help recurrent matrices even at 128 width (against: no effect at this scale).
-Prior work and the gap. Rudolph et al.~\cite{rudolph} used random search on small 2-player games only. Eimer et al.~\cite{eimer} compared tuners on single-agent RL, and JumpStart~\cite{jumpstart} ranking agreement against budget in offline RL (it plateaus after 10--25 trials on Atari, and keeps rising on continuous control). Muon has been tested in RL only for LLM post-training, where it collapsed in RLVR~\cite{pion} or helped depending on the estimator~\cite{muonagentic}. POPGym Arcade~\cite{popgym} showed return alone confounds memory evaluation (single-agent). Prior Figgie work is a non-learning simulation~\cite{disilvio} and the CS224R report~\cite{cs224r}. We found no tuner$\times$optimizer factorial for game-solving RL, no ranking-vs-budget curves in multi-agent games, and no test of whether memory-architecture rankings survive tuning against a ground-truth belief. H0, H1 and H2 would each be new for multi-agent games, so the study pays off either way.
+\section{Rivals, and what would be new}
+T0: at a matched budget, neither PROTEIN nor Muon changes PPO's result in either domain. T1: the effects carry, same sign in the small games and Figgie. T2: they flip in the large game, where evals are noisy and trials are costly. M0: tuned minGRU's state adds nothing beyond its input (the midterm's 58\% was policy and input features). M1: it adds goal-suit belief once tuned.
+Prior work. Rudolph et al. used random search on small 2-player games. Eimer et al.~\cite{eimer} compared tuners on single-agent RL. JumpStart~\cite{jumpstart} found that ranking agreement plateaus after 10--25 trials on Atari but keeps rising on continuous control, in offline RL. Muon has been tested in RL only for LLM post-training~\cite{pion,muonagentic}. POPGym Arcade~\cite{popgym} showed that return alone confounds memory evaluation. Prior Figgie work is a non-learning simulation~\cite{disilvio} and the CS224R report~\cite{cs224r}. We found no tuner $\times$ optimizer comparison in multi-agent games, and no memory probe in RL controlled against random-init nets with a placebo core.
 
-\section{Shared interface with the IIG half (agreed with Rich)}
-Rich builds and versions a small package, \file{tsinghua-rl/iig/tune/}, which Figgie imports as a pinned git dependency, without a fork: random-search, PROTEIN and CARBS adapters, the shared search-space spec, a Muon/AdamW optimizer factory, budget accounting, Trackinizer SeedSequence seeds, and the ledger plus Trackinizer pre-registration. Both halves give each cell the same env-step budget $B$ = trials $\times$ seeds $\times$ steps, and report the same statistics: rank per cell, Kendall $\tau$ between tuned and published rankings, 10 fresh confirmation seeds. $B$ is a placeholder until Rich's PROTEIN pilot sets it. We budget his working assumption, $B=4.5\times10^9$ (150 trials $\times$ 3 seeds $\times$ 10\,M steps), and E1 scales linearly if it changes. Each game supplies only an env adapter and an eval metric. Rich has accepted the five things Figgie needs: (1) Budget in env steps and \emph{core-hours}, since Figgie is CPU-bound and GPU-hours are the wrong unit. (2) Recurrent policies in the Muon factory: a rule for GRU/minGRU gate matrices (stacked or per gate), with embeddings, heads and biases on AdamW. (3) A noisy, maximised objective (profit is $\pm$4 \$/game per 1000 games): adapters take a noise estimate and a sign, and Figgie reports seat-rotated duplicate games. (4) Asynchronous batches and resume: 12--16 trials run at once per 32-core box, finish out of order and span 12\,h leases, so tuner state must checkpoint. (5) Game-specific hyperparameters (BC lift weight, self-play share, shaping) on top of the shared core (lr, entropy, clip, GAE $\lambda$, KL coefficient).
+\section{Shared design with the IIG half (agreed with Rich)}
+Both halves run $\{$random search, PROTEIN$\}\times\{$AdamW, Muon$\}$ through one pinned package, \file{tsinghua-rl/iig/tune}: tuners, the Muon/AdamW factory (Figgie marks its GRU gate matrices), budget in env steps and core-hours, SeedSequence seeds, and pre-registration. PPO $\times$ none is the bridge cell, with the same core space (lr, entropy, clip, GAE $\lambda$, value coefficient) and the same budget accounting in both halves. Both log anytime curves (best score and rank against cumulative env steps) at fixed checkpoints $2^k\times10^8$ steps, so the cross-half comparison is read exactly at Figgie's budget $B_F=8\times10^8$ steps per cell, a point on Rich's longer curves. Effects are reported with bootstrap CIs, since 4 matched pairs cannot reach $p<0.05$ in a sign test. PROTEIN's early stopping (pruning trials by early rank) is off in both halves through one key in the shared \file{iig/tune} config, since on Figgie early rank did not predict the final result (below); trial length stays a searched dimension.
+
+\section{What the pilot measured (exploratory, \file{docs/PILOT\_PREREG.md})}
+compute-01, free slot, 3 trials at once (job d3a1e630): 0.131 core-h per million steps (0.86$\times$ the plan's 0.153), 37\,M env steps per wall-clock hour with pauses included (no thermal pauses after a 5\,s test), and a 2.5\,GB peak in a 4\,GB share. A rented 24-vCPU Xeon E5-2690 v3 box (78abf6c2, \$0.56) gave 0.29 core-h per million steps at 25\% core utilisation, 21\,M steps per box-hour. More env workers per run barely help (2 to 8 workers: 1.3$\times$ on compute-01). Ranking at 250 updates did not predict the final eval (Spearman $-0.89$, 6 trials), and training profit predicted it poorly (0.27). A 500-game eval has a 95\% CI of $\pm$6 \$/game, as wide as the spread between trials, and costs only 0.008 core-h. So trials run 500--2000 updates (8--33\,M steps), never 250, and every trial is scored on 4000 duplicate games ($\pm$2 \$/game). The saving comes from fewer trials per cell: $B_F$ buys about 50 trials of 16\,M steps, the size of Rudolph's random search.
 
 \section{Experiments}
-E0 (before any tuning, $\approx$0 cost). Common-trajectory probes: every network, trained and random-init, run over the same 3000 recorded games, removing the policy confound. A known-answer recall check per core (a cue at tick 0, probed at tick 239) separates ``memory does not help'' from ``cannot learn memory at this length''. MMD added to \file{figgie/rl/train.py} as PPO plus entropy plus a KL term to the previous policy, which is what upstream MMD runs~\cite{rudolph} (\file{mmd.py:469}).
+E0, free on compute-01. The controlled probe (below) on one common set of 3000 recorded games for every existing net, trained and random-init, with games sorted by id before the 5-fold split (so folds no longer depend on \texttt{--workers}). A known-answer recall check (a cue at tick 0, probed at tick 239) for none and minGRU, 2 seeds, $\leq$2000 updates.
+E1. PPO $\times$ $\{$none, minGRU$\}$ $\times$ $\{$random search, PROTEIN$\}$ $\times$ $\{$AdamW, Muon$\}$ = 8 cells, $B_F$ each, objective: duplicate profit against FV + Bayes + MM.
+E2. Each cell's winner and the current recipe (none, minGRU) = 10 arms, 5 fresh seeds $\times$ 2000 updates, paid. Seeds 6--10 run on the free slot if it is open, and both outcomes are pre-registered: $n=10$ is primary if it completes by 8 Dec, else $n=5$, stated as a deviation.
+Dropped from the earlier plan: CARBS, MMD, the GRU and transformer cores in E1, learned best responses, mini-generals and NLHE.
 
-E1, the factorial. 3 tuners (random search, Rudolph's protocol, as control, CARBS, PROTEIN) $\times$ 2 optimizers $\times$ 2 algorithms (PPO, MMD) $\times$ 3 cores (none, minGRU, GRU) $=$ 36 cells, budget $B$ each, multi-fidelity from 250 to 2000 updates (4--33\,M steps). Random search with AdamW is the control. Tuning objective: duplicate profit against the held-out table FV + Bayes + MM. A second tuner replicate on 4 cells measures run-to-run tuner variance.
-
-E2, confirmation. Each cell's winner and the current recipe, 10 fresh seeds $\times$ 2000 updates, on common-trajectory probes and the 6-matchup eval. Approximate exploitability~\cite{timbers}: one PPO best response (20\,M steps, against 3 copies) for each of the 36 winners and 3 current-recipe agents.
-
-Out of scope on Figgie, with reasons. ESCHER and DREAM, as Phase 1 measured 40--185 CPU-h per ESCHER run on the small games alone. A CFR+ floor: no tabular solution exists. We report the best heuristic (AdaptiveMM, $+22.2\pm2.4$ \$/game in our tournament) and the exact posterior for probes, but this is a limitation: neither is an equilibrium bound, and a learned best response only bounds exploitability from below. The transformer core (4$\times$ the cost, degenerate so far) and mini-generals or NLHE move to Jan--Feb.
-
-\section{Pre-registered predictions (filed in the ledger and Trackinizer before E1 launches)}
-Our past misses underpredicted the new method (minGRU predicted 43--52\%, observed 58.0\%), so the intervals are wide and skewed toward the treatment. Baselines: current recipe, 3 seeds, none core $+14.6$ \$/game against FV + Bayes + MM.
+\section{Pre-registration, filed before any E0--E2 run}
+The controlled probe. $\Delta_{\text{rand}}$ is the accuracy at tick 239 of the trained net's hidden state minus that of a same-architecture random-init net, on the same trajectories. $\Delta_{\text{cond}}$ is the accuracy of a probe on [input, hidden state] minus a probe on the input alone. For the none core, the hidden state is a function of the current input, so $\Delta_{\text{cond}}(\text{none})$ is the placebo and must lie in $\pm$1 point, or the probe is declared invalid. Memory helps if $\Delta_{\text{cond}}(\text{minGRU})-\Delta_{\text{cond}}(\text{none})\geq2$ points and its 90\% bootstrap CI excludes 0. Past misses underpredicted the new method (minGRU predicted 43--52\%, observed 58\%), so the intervals lean toward the treatment.
 
 {\small\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}p{0.52\textwidth}cc@{}}
+\begin{tabular}{@{}p{0.56\textwidth}cc@{}}
 \toprule
-Quantity (E2, 10 seeds unless stated) & Median & 90\% interval \\
+Quantity (E2 arms unless stated) & Median & 90\% interval \\
 \midrule
-P1 Tuning gain, random$\times$AdamW, PPO$\times$none, minus current recipe (\$/game) & $+4$ & $[-2, +15]$ \\
-P1b Same, best tuner and optimizer & $+6$ & $[-2, +20]$ \\
-P2 Best tuned memory core minus tuned none, common-trajectory probe (pp) & $+2$ & $[-4, +12]$ \\
-P3 Same, profit (\$/game) & $0$ & $[-6, +10]$ \\
-P4 MMD minus PPO, tuned, same core (\$/game) & $+1$ & $[-6, +8]$ \\
-P5 Muon minus AdamW, matched trials, mean over cells (\$/game) & $0$ & $[-6, +8]$ \\
-P6 Share of $B$ for PROTEIN (CARBS) to match random search's best & 0.3 (0.4) & $[0.1, >1]$ \\
-P7 Kendall $\tau$, 6 arms ranked at 25\% vs 100\% of $B$ & 0.5 & $[-0.1, 1.0]$ \\
-P8 Kendall $\tau$, published-recipe vs tuned ranking & 0.3 & $[-0.5, 1.0]$ \\
-P9 Best-response gain vs best tuned agent $\div$ vs current PPO-v2 & 0.8 & $[0.4, 1.3]$ \\
+P1 $\Delta_{\text{cond}}$(none), placebo, points & 0.0 & $[-1, +1]$ \\
+P2 $\Delta_{\text{cond}}$(minGRU), best tuned arm, points & $+0.5$ & $[-1.5, +5]$ \\
+P3 $\Delta_{\text{rand}}$, tuned none (tuned minGRU), points & $-5$ ($-4$) & $[-12, +2]$ ($[-12, +4]$) \\
+P4 PROTEIN minus random search at $B_F$, mean of 4 pairs, \$/game & $+1$ & $[-5, +8]$ \\
+P5 Muon minus AdamW at $B_F$, mean of 4 pairs, \$/game & 0 & $[-6, +6]$ \\
+P6 Best tuned none arm minus current recipe (+14.6), \$/game & $+4$ & $[-3, +15]$ \\
+P7 Share of $B_F$ at which PROTEIN's best-so-far stays within 2 \$/game of its final & 0.4 & $[0.1, 1.0]$ \\
 \bottomrule
 \end{tabular}}
 
-Decision rules. ``Memory helps'' keeps the rule in \file{docs/PREREGISTRATION.md} (mean $\geq$3 points over none), now on common trajectories, 10 seeds, one-sided Mann--Whitney, Holm over the cores. CARBS and PROTEIN each against random search, and Muon against AdamW: sign tests over matched cell pairs (12, 12 and 18), Holm, plus 90\% bootstrap CIs. Transfer (stated, not tested): tuner and optimizer effects have the same sign as in Rich's half, probability 0.6 each. Everything else is exploratory.
+Transfer (stated, not tested): the signs of P4 and P5 match Rich's half, probability 0.6 each. Everything else is exploratory.
 
-\section{Compute}
-Training is CPU-bound (Python simulation and opponent forward passes, a 128-wide learner), so we count cores: a 2000-update run costs 5 core-h for none and 7 for minGRU/GRU, measured (\file{docs/COMPUTE\_PLAN\_FINAL.md}).
+\section{Compute and cost}
+Training is CPU-bound, so we count env steps per wall-clock hour. compute-01's free slot gives 37\,M/h. At 70\% availability that is about $6\times10^8$ steps a day. Rented boxes cost about \$6 per $10^9$ steps: 0.29 core-h per million steps at 25\% utilisation, on the cheapest 16-core box (\$0.065/h quoted) $\times$1.25. They are slower per core than compute-01, so they take only what cannot wait. Free: E0, $5.8\times10^9$ steps of E1, and E2 seeds 6--10 ($1.6\times10^9$), about 12 days of the slot. Paid: E2 seeds 1--5 ($1.6\times10^9$, \$9.8) and $0.6\times10^9$ of E1 (\$3.6), plus a 10\% reserve (\$1.3). \textbf{Total: about \$15}, inside the \$18 left of Figgie's \$25 lifetime share. Spent so far: \$1.65 lifetime, of which the pilot about \$0.55. If compute-01 delivers less than half by 28 Nov, E1 stops at the $4\times10^8$ checkpoint and is read there.
 
-{\small\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lrl@{}}
-\toprule
-Item & Core-h & Basis \\
-\midrule
-E1, 36 cells $\times$ $B$ plus 4 replicate cells, incl.\ eval & 34{,}600 & 685 (none) or 960 core-h per cell \\
-E2 confirmation, 39 arms $\times$ 10 seeds, probes and eval & 3{,}240 & 5--7 + 2 core-h per run \\
-E2 best responses (39 $\times$ 20\,M steps), E0 recall check & 380 & 6 core-h each, 8 runs $\leq$4000 updates \\
-Contingency (25\%) & 9{,}560 & reruns, longer runs if recall needs them \\
-\textbf{Total} & \textbf{47{,}800} & \\
-\bottomrule
-\end{tabular}}
-
-Where. A rented 32-core box with a 3090-class GPU is quoted at \$0.20/h on Vast (16 Nov), about \$0.007 per core-hour, so one finished 2000-update run costs about \$0.05 quoted. A lone 8-core 5090 costs about 20$\times$ more per core, with its GPU idle. Total: 47{,}800 core-h $\approx$ 1{,}600 box-hours, \textbf{about \$400} (\$320 quoted $\times$ 1.25, the top of the 0.92--1.25 billed-to-quote range measured on 16 Nov). The \$30/day limit across all tenants allows about 5 boxes, so the full design takes about 13 days of boxes. If the cap is lower, we cut in this order: the tuner replicates (to \$365), the GRU core, keeping none vs minGRU (to \$230), MMD, keeping PPO (to \$125: 12 cells, all 3 tuners $\times$ 2 optimizers at the matched $B$, 4 days), and last, with Rich, 1 seed per screened trial in both halves (to \$55). The pilot replaces these estimates with measured core-hours per trial. A throughput lever we will try but do not budget on: a C engine with batched opponent inference, in the PufferLib style~\cite{puffer}, gated on bit-exact parity with \file{figgie/engine.py} over 10{,}000 games. (Rich's C port of the small games gained $\approx$150$\times$.)
+\section{What the smaller design can and cannot claim}
+Can: the sign and size, with CIs, of PROTEIN vs random search and Muon vs AdamW for PPO on Figgie at $8\times10^8$ steps per cell, on 2 cores and 5--10 seeds, and whether they match Rich's exact games at that budget, through an identical bridge cell. Whether tuned minGRU holds goal-suit belief beyond its input, against a placebo core. How tuned PPO compares with the best heuristic (AdaptiveMM, $+22.2\pm2.4$ \$/game).
+Cannot: any algorithm ranking on Figgie (PPO only), CARBS, other cores, exploitability (no best responses and no equilibrium floor, since AdaptiveMM is not an equilibrium bound), budgets above $8\times10^8$ steps or a scaling law, significance from sign tests, and Muon at large width (128-wide nets only). A limitation, not a flaw: at $8\times10^8$ steps Rich's cells run about 27 trials (3 seeds $\times$ 10\,M) and ours about 50 single-seed trials of 8--33\,M, so equal step budgets do not mean equal search breadth or equal noise per trial. The halves are compared on effects within each game (signs, ranks, effect sizes), never on absolute numbers.
 
 \section{Milestones}
-17--21 Nov: pilot, inside the \$5.5 left of tenant geoff's share: one tuner (PROTEIN, or a stub until \file{iig/tune} exists) on the none core, short runs, one rented 32-core box, $\leq$\$5, pre-registered, launched with \texttt{compute --exploratory} and kept out of the comparison: only runs through \file{iig/tune} count. It measures core-hours per trial, worker scaling (2/4/8) and \$ per cell. In parallel, E0 on compute-01 and MMD in the trainer. $\approx$23 Nov, midterm presentation: the 3-seed memory table, common-trajectory probes, the pilot and this plan. From 23 Nov: E1, if the cap is set by 22 Nov (4 days at \$125, 13 at \$400), then E2 (3 days), done by 10 Dec at full scale. Each day the cap slips moves both by a day. To 20 Dec: scoring, figures, poster (week 15, 21--27 Dec). Final report 8 Jan. Jan--Feb (joint paper, outside the course): merge with Rich's half, transformer core, mini-generals or NLHE.
+17--22 Nov: E0 on compute-01, Figgie adapter to \file{iig/tune} once Rich versions it, predictions filed. $\approx$23 Nov, midterm presentation: memory table, controlled probes, pilot and this plan. 23 Nov--2 Dec: E1 (free, with the paid share in parallel). 3--8 Dec: E2. To 20 Dec: scoring, figures, poster (21--27 Dec). Final report 8 Jan.
 
 {\scriptsize\begin{multicols}{2}
 \begin{thebibliography}{99}\setlength{\itemsep}{-2pt}\renewcommand{\section}[2]{}
 \bibitem{rudolph} M.~Rudolph et al. Reevaluating policy gradient methods for IIGs. ICLR 2026, arXiv:2502.08938.
 \bibitem{eimer} T.~Eimer, M.~Lindauer, R.~Raileanu. Hyperparameters in RL and how to tune them. ICML 2023, arXiv:2306.01324.
 \bibitem{jumpstart} N.~Omi et al. JumpStart your policy learning with lessons from 160,000 training runs. arXiv:2609.13730, 2026.
-\bibitem{adkins} J.~Adkins, M.~Bowling et al. Evaluating hyperparameter sensitivity in RL. arXiv:2412.07165, 2024.
 \bibitem{pion} Pion. arXiv:2605.19282, 2026.
 \bibitem{muonagentic} When does Muon help agentic reinforcement learning? arXiv:2607.16169, 2026.
 \bibitem{popgym} Investigating memory in model-free RL with POPGym Arcade. arXiv:2503.01450, 2025.
 \bibitem{disilvio} Traders in a strange land: agent-based simulation of Figgie. arXiv:2110.00879, 2021.
 \bibitem{cs224r} D.~Li Yang. Reinforcement learning for Figgie. Stanford CS224R project report, 2026.
-\bibitem{carbs} A.~Fetterman et al. Tune as you scale (CARBS). arXiv:2306.08055, 2023. PROTEIN: puffer.ai/blog.html.
-\bibitem{timbers} F.~Timbers et al. Approximate exploitability. arXiv:2004.09677.
-\bibitem{puffer} J.~Suarez. PufferLib. arXiv:2406.12905, 2024.
 \end{thebibliography}\end{multicols}}
 \end{document}
