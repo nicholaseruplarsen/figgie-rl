@@ -12,6 +12,7 @@ Sized by what each question needs, not by a budget. Every rate below is measured
 | minGRU core, same setup | 3.1–3.4 h (3.8 h under load) | `runs/memory/mingru_s*/train_log.jsonl` |
 | GRU core, same setup | 3.3–3.6 h (5.2 h under load) | `runs/memory/gru_s*/train_log.jsonl` |
 | transformer core, learner on a compute-01 3090, 2 env workers | 8.5 h, with update time rising from 4.5 s to 15.6 s as transformer snapshots fill the self-play pool | `runs/memory-gpu/transformer_s0/train_log.jsonl` |
+| transformer core s1, updates 151–2000, learner on a rented Vast 3090, 16 env workers (31 CPUs) | 3.4 h, 6.57 s/update on average (5.5 min per 50 updates), $0.87 for the whole job | `runs/memory-diag/transformer_s1/train_log.jsonl`, compute job 47e2677b |
 | Probe (3000 games) + eval (6 matchups × 1000 games) per run | 0.5–1.5 h on 2 cores | queue log timestamps minus training time |
 | Recording games for a probe, one core | 40 games in 3.3 s, so 3000 games in about 4 min | `scripts/common_probe.py` smoke test, 15 Nov |
 | Engine alone, heuristic agents | about 11 ms per game, 85,000 decisions/s per core | `RESULTS.md` §1 |
@@ -20,7 +21,7 @@ The bottleneck is CPU simulation, not the GPU. Every step runs four agents in Py
 
 So the useful unit is the core-hour. One 2000-update run costs about 5 core-h for none, 7 for minGRU and GRU, and about 25 for the transformer (3 busy cores for 8.5 h). The probe and eval add about 2 core-h per run.
 
-Not measured: how one run scales past 2 env workers. The learner steps all 32 envs in one process and waits for the slowest worker, so going from 2 to 8 workers will give less than 4×. The plan therefore gets its speed from running many runs side by side, 2–3 cores each, and measures 2/4/8 workers in the first hour of the first rented box.
+Not measured cleanly: how one run scales past 2 env workers. The one data point is transformer s1 above, at 16 workers, but its self-play pool started empty at update 150, so it is not comparable to s0. The learner steps all 32 envs in one process and waits for the slowest worker, so going from 2 to 8 workers will give less than 4×. The plan therefore gets its speed from running many runs side by side, 2–3 cores each, and measures 2/4/8 workers in the first hour of the first rented box.
 
 ## Machines and prices
 
@@ -118,3 +119,8 @@ Recommended: rented 32-core box, one 6 h lease, 8–12 Dec, leaving 13–20 Dec 
 Total billed, about $40–75 including contingency, against a tenant cap of $10. Nicholas needs to set a cap before item 3.
 
 The many-core box beats a faster GPU for everything except item 4. With 32 cores at a 3090-box price, the twelve long runs cost about $1 each billed, against about $23 each on a lone 5090.
+
+## Probe protocol: sort the games
+
+`scripts/probe_ppo.py` and `scripts/placebo_probe.py` concatenate the recorded games in worker-chunk order (`range(w, games, workers)`), and the 5-fold `StratifiedKFold(shuffle=True, random_state=0)` assigns folds by position. So `--workers` changes the CV split, though the games and hidden states are identical. Every sealed probe used `--workers 2`. A rerun at 31 workers moved transformer s1 from 44.03% to 45.03% and minGRU s0's placebo true-label accuracy from 58.30% to 56.9%. At 2 workers, main's script reproduces none_s0, minGRU_s0 and GRU_s0 exactly (compute-01 job 2e38f311). Every scored probe should keep `--workers 2`. New probes should sort games by index before the CV, which changes the split once, so those numbers are a new protocol and must not be mixed with the sealed ones.
+
