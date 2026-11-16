@@ -106,7 +106,9 @@ def main():
     ap.add_argument("--ncpu", type=int, required=True)
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--max-hours", type=float, default=4.0, help="start no round that would end after this")
     a = ap.parse_args()
+    t_start = time.time()
     smoke = os.environ.get("SMOKE") == "1"
     os.makedirs(a.out, exist_ok=True)
     rng = random.Random(a.seed)
@@ -134,7 +136,11 @@ def main():
     # Phase B: tuning rounds, `batch` trials at once, 2 env workers + learner each.
     done, tid = [], 0
     t_phase = time.time()
+    last_round = 0.0
     for r in range(rounds):
+        if time.time() - t_start + last_round > a.max_hours * 3600:
+            break
+        t_round = time.time()
         props = propose(rng, done, batch, fids)
         running = []
         for p, upd in props:
@@ -162,6 +168,7 @@ def main():
             row = dict(phase="tune", **t)
             done.append(row)
             log.write(json.dumps(row) + "\n"); log.flush()
+        last_round = time.time() - t_round
     wall_tune = time.time() - t_phase
 
     ok = [t for t in done if t.get("score") is not None]
