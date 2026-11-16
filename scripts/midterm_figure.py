@@ -2,7 +2,7 @@
 
 Reads results/proposal_revelation.json and results/probe_ppo_v2.json.
 
-    python scripts/midterm_figure.py [proposals/midterm_results.pdf]
+    python scripts/midterm_figure.py [assignments/midterm/midterm_results.pdf]
 """
 import json
 import sys
@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-out = sys.argv[1] if len(sys.argv) > 1 else "proposals/midterm_results.pdf"
+out = sys.argv[1] if len(sys.argv) > 1 else "assignments/midterm/midterm_results.pdf"
 rev = json.loads(Path("results/proposal_revelation.json").read_text())
 pr = json.loads(Path("results/probe_ppo_v2.json").read_text())
 

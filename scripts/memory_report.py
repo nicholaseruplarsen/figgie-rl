@@ -7,7 +7,7 @@ measured against: it shows how much goal-suit signal the observation already
 carries without any memory.
 
     python scripts/memory_report.py --roots runs/memory runs/memory-gpu \
-        --tex proposals/memory_table.tex --fig proposals/memory_probe.pdf
+        --tex assignments/midterm/memory_table.tex --fig assignments/midterm/memory_probe.pdf
 """
 import argparse
 import json
