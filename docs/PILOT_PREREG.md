@@ -46,3 +46,9 @@ The paid relaunch was refused by compute's global $30/day cap. The pilot runs fi
 It measures compute-01's own throughput. A rented retry (≤$0.5, cheapest value box) follows when the day cap clears.
 Predictions for compute-01 (median, 90%): core_h_per_Msteps 0.17, [0.10, 0.35]; train wall per 1000-update trial 1.3 h, [0.8, 2.5].
 Predictions 1–4 above apply to the rented retry. If the slot OOMs, the job is relaunched with fewer trials at a time, never bigger.
+
+## Addendum 3, 2026-11-16: commit hashes after the history rewrite
+Bram rewrote the unpushed history (author and trailer cleanup) with byte-identical trees, so code is unchanged.
+Hashes cited above map as: 59c2d30→446e730, d792d73→7f01288, 75497d9→c61e933, 0312375→988014d, 31f5289→771d2e8,
+d8f4853→70131e7, b1d7e58→f42257b. Pilot results stamped CODE_VERSION b1d7e58 ran the code of f42257b.
+Full map: `../figgie_rewrite_map.txt`. Old commits: refs/backup/pre-unsign/*.
