@@ -38,3 +38,11 @@ so the install step failed before any training. Changes for the relaunch, made b
   correlation between training profit (mean of the last 25 logged updates) at update 250 and at update 500, and the
   final eval profit. Prediction: rho(500 vs final) 0.6, [0.0, 0.95], and rho(250 vs final) 0.4, [-0.3, 0.9].
   If rho(500) >= 0.7, per-trial lengths up to 500 updates are judged enough for ranking trials in the reduced plan.
+
+## Addendum 2, 2026-11-16: first on compute-01's free slot
+The paid relaunch was refused by compute's global $30/day cap. The pilot runs first on compute-01 (free tier, GPU1 slot,
+4 GB RAM share, 3 trials at a time, 3 rounds), code memory-agents b1d7e58, job `runs/pilot/free/job.sh` sha256
+`0262b638dc4dc4c7a98d17bc2e0e4e87171f4917bce5552c8006fb48407fb678` (smoke from an empty HOME: log sha256 `2fba68ce…`).
+It measures compute-01's own throughput. A rented retry (≤$0.5, cheapest value box) follows when the day cap clears.
+Predictions for compute-01 (median, 90%): core_h_per_Msteps 0.17, [0.10, 0.35]; train wall per 1000-update trial 1.3 h, [0.8, 2.5].
+Predictions 1–4 above apply to the rented retry. If the slot OOMs, the job is relaunched with fewer trials at a time, never bigger.
