@@ -52,3 +52,10 @@ Bram rewrote the unpushed history (author and trailer cleanup) with byte-identic
 Hashes cited above map as: 59c2d30→446e730, d792d73→7f01288, 75497d9→c61e933, 0312375→988014d, 31f5289→771d2e8,
 d8f4853→70131e7, b1d7e58→f42257b. Pilot results stamped CODE_VERSION b1d7e58 ran the code of f42257b.
 Full map: `../figgie_rewrite_map.txt`. Old commits: refs/backup/pre-unsign/*.
+
+## Results, 2026-11-16 (exploratory, scored against the predictions above)
+- compute-01, free (d3a1e630, 9 trials, 3 rounds): core_h_per_Msteps 0.131 (predicted 0.17, [0.10, 0.35], inside). Wall per 1000-update trial 1.32 h with 3 at once (predicted 1.3 h, [0.8, 2.5], inside). 37 M steps per wall-clock hour, peak 2.47 GB of 4, no OOM. No thermal pause seen after the 5 s test at 06:58Z.
+- Rented (78abf6c2): a mis-provisioned box (an RTX 3060 Ti host in Ontario, 24 vCPUs of a Xeon E5-2690 v3, $0.174/h, about $0.56). Only round 1 finished, 7 trials. Predictions: 1. core_h_per_Msteps 0.290 (inside [0.10, 0.45]). 2. ratio_to_plan 1.90 (inside [0.65, 3.0]). 3. 8-vs-2-worker time per update 0.72 (inside [0.30, 0.95]), 0.77 on compute-01. 4. box_core_utilisation 0.25 (miss, below [0.40, 0.95]). 5. Billed cost about $0.56 (inside [$0.45, $1.90]).
+- Rank stability (compute-01, 1000-update trials, n = 3): rho(training profit at 500, final eval) 0.5 (predicted 0.6, [0.0, 0.95], inside). rho(at 250, final eval) -0.5 (predicted 0.4, [-0.3, 0.9], miss). Across all 6 trials of 500 updates or more, rho(at 250, eval) was -0.89. The rule (rho(500) >= 0.7) is not met, so trials of up to 500 updates are not judged enough. The reduced plan uses 500-2000 updates per trial and 4000-game evals.
+- Bug, no effect on these numbers: pilot_tune.py waits for trials in launch order, so a trial that finished early has its train_wall_s recorded late (78abf6c2 trials 3-6). Round wall times and CPU times are unaffected.
+- First launch f79c7429: $0.014, no result (install failed). Pilot total about $0.58, inside $3.
