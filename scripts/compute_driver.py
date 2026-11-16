@@ -71,7 +71,7 @@ def main():
         while True:                                   # one lease per iteration; resume on expiry
             work = Path(tempfile.mkdtemp(prefix=f"vint-{name}-"))
             (work / "job.sh").write_text(job_script(arch, int(seed), run, jargs, py=REMOTE_PY))
-            cmd = ["compute", "run", "--tenant", a.tenant, "--tier", "free", "--vram", str(a.vram),
+            cmd = ["compute", "run", "--tenant", a.tenant, "--tier", "free", "--data-class", "public", "--vram", str(a.vram),
                    "--ram", str(a.ram), "--hours", str(a.hours), "--json", "--workdir", str(work),
                    "--", "bash", "job.sh"]
             r = sh(cmd, env=env, timeout=600)
