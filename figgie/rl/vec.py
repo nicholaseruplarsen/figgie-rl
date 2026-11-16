@@ -40,8 +40,10 @@ def _worker(conn, env_kwargs, seeds, pool_kwargs):
 
 
 class VecEnv:
-    def __init__(self, n_envs, n_procs, seed, env_kwargs, pool_kwargs):
-        ctx = mp.get_context("fork")
+    def __init__(self, n_envs, n_procs, seed, env_kwargs, pool_kwargs, start="fork"):
+        # "spawn" workers start from a fresh interpreter and so do not inherit the
+        # learner's memory (e.g. a CUDA context) the way forked workers do.
+        ctx = mp.get_context(start)
         per = np.array_split(np.arange(n_envs), n_procs)
         self.split = [len(p) for p in per]
         self.conns, self.procs = [], []

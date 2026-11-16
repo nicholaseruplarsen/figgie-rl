@@ -2,7 +2,8 @@
 
 PPO sits at seat 0 against the other three agents of the revelation table in
 scripts/proposal_figure.py. At each probe tick we record the agent's 69-dim
-input and its 128-dim GRU state after acting, then fit 5-fold cross-validated
+input and the memory core's output after acting (the vector the actor reads: the GRU state for
+GRU agents), then fit 5-fold cross-validated
 logistic regressions predicting the true goal suit from (a) the input alone
 and (b) the GRU state. References: the exact posterior from the dealt hand and
 the card-counting posterior that is part of the input (features 45:49).
@@ -30,7 +31,7 @@ def run_chunk(job):
     from figgie.agents.registry import make
     from figgie.belief import goal_posterior
     from figgie.engine import play
-    from figgie.rl.policy import PolicyAgent, load
+    from figgie.rl.policy import PolicyAgent, load_net
 
     class Recorder(PolicyAgent):
         def reset(self, obs):
@@ -45,11 +46,11 @@ def run_chunk(job):
         def act(self, obs):
             a = super().act(obs)
             if obs.tick in CHECK:
-                self.rec[obs.tick] = (self.last_x.copy(), self.h[0].numpy().copy())
+                self.rec[obs.tick] = (self.last_x.copy(), self.net.last_z[0].numpy().copy())
             return a
 
     ckpt, idx = job
-    net = load(ckpt).net
+    net = load_net(ckpt)
     out = []
     for i in idx:
         agent = Recorder(net, deterministic=True)
@@ -108,6 +109,9 @@ def main():
             res[f"{name}_ll"].append(ll)
         print(t, {k2: (round(v[0], 3), round(v[1], 3)) for k2, v in rows.items()}, flush=True)
     res["seconds"] = round(time.time() - t0, 1)
+    from provenance import provenance, flag_exploratory
+    res["_provenance"] = provenance(script="scripts/probe_ppo.py")
+    res = flag_exploratory(res)
     Path(args.out).write_text(json.dumps(res, indent=1))
     print(args.out, res["seconds"], "s")
 

@@ -13,11 +13,13 @@ import random
 from ..actions import decode, legal_mask
 from ..belief import eb
 from ..engine import BID, LIFT, Config, Game, Obs
-from .features import Featurizer
+from .features import make_featurizer
 
 
 class FiggieEnv:
-    def __init__(self, opp_sampler, seed=0, beta=0.5, gamma=0.995, lift_alpha=0.0, reward_scale=0.1, cfg=None):
+    def __init__(self, opp_sampler, seed=0, beta=0.5, gamma=0.995, lift_alpha=0.0, reward_scale=0.1, cfg=None,
+                 flow=False):
+        self.Feat = make_featurizer(flow)
         self.sample_opps = opp_sampler
         self.rng = random.Random(seed)
         self.beta, self.gamma, self.lift_alpha, self.scale = beta, gamma, lift_alpha, reward_scale
@@ -37,7 +39,7 @@ class FiggieEnv:
         for p, a in self.agents.items():
             a.reset(self.obs[p])
         self.me = self.obs[self.seat]
-        self.feat = Featurizer(self.me)
+        self.feat = self.Feat(self.me)
         self.lifts = 0
         self.gen = self._run()
         next(self.gen)
