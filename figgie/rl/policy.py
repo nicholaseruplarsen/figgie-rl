@@ -47,11 +47,14 @@ class Block(nn.Module):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, arch="gru", obs_dim=OBS_DIM, hidden=H, n_actions=N_ACTIONS, window=128, layers=2, heads=4):
+    def __init__(self, arch="gru", obs_dim=OBS_DIM, hidden=H, n_actions=N_ACTIONS, window=128, layers=2, heads=4,
+                 feat=None):
         super().__init__()
         assert arch in ARCHS, arch
         self.arch, self.hidden, self.window = arch, hidden, window
         self.config = dict(arch=arch, obs_dim=obs_dim, hidden=hidden, window=window, layers=layers, heads=heads)
+        if feat is not None:            # feature kind (causal test); older nets infer it from obs_dim
+            self.config["feat"] = feat
         self.enc = nn.Sequential(nn.Linear(obs_dim, hidden), nn.Tanh(), nn.Linear(hidden, hidden), nn.Tanh())
         if arch == "gru":
             self.gru = nn.GRUCell(hidden, hidden)
@@ -141,6 +144,7 @@ class ActorCritic(nn.Module):
             z = torch.stack(zs)
         else:
             z = self._tf_unroll(e, s0, done)
+        self.last_z = z
         logits = self.actor(z).masked_fill(~mask, -1e9)
         return logits, self.critic(z).squeeze(-1), None
 
@@ -175,7 +179,7 @@ class PolicyAgent:
         self.net, self.det, self.name = net, deterministic, name
         self.gen = torch.Generator().manual_seed(seed or 0)
         d = net.config["obs_dim"]
-        self.flow = "recall" if d == RECALL_DIM else d == FLOW_DIM
+        self.flow = net.config.get("feat") or ("recall" if d == RECALL_DIM else d == FLOW_DIM)
 
     def reset(self, obs):
         self.feat = make_featurizer(self.flow)(obs)
