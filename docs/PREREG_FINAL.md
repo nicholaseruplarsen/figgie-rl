@@ -71,3 +71,36 @@ The audit used `scripts/probe_audit.py` on the 11 E0 nets and 3000 games. Every 
 ## To be sealed before their runs
 
 Nothing is pending. R1, R2 and H1 were sealed at 16:17 UTC, before the recall job launched.
+
+## Results
+
+### H1, H-suff (#5119), job 1b61b9aa, evaluator controlled_probe_v2@ffc5a04797f0
+
+On 10000 E0 games, the supervised sequence GRU reaches 73.54% and the last-input probe 63.72%, a gain of
+**+9.82 points [8.97, 10.66]**. That is above the sealed 90% interval [−1, +6], so **H-suff is refuted**: the public
+history holds about 10 points of goal-suit information beyond the last input. On the same games, trained minGRU
+adds +1.18 [0.81, 1.58] over none (v2; placebo none +0.28, valid). The small memory gain is therefore a learning
+failure, not sufficiency. The platform holds the result at `pending-control` until a placebo runs:
+`scripts/hsuff_placebo.py` (same pipeline, labels permuted).
+
+### R1, R2, the recall check (#5117, #5118), jobs 1b61b9aa and 8c82fa4b, evaluator controlled_probe_v2@ffc5a04797f0
+
+**Deviation.** The first lease (6 h) ended with minGRU s1/s2 and GRU s1 at 1800, 1825 and 1725 updates (their last
+checkpoints). Job 8c82fa4b resumed them to 2000 from those weights, with the Adam state and the PFSP pool reset.
+The none runs had finished.
+
+| Core (seeds) | State acc | Δ_cond, points [CI90] | Per seed |
+|---|---|---|---|
+| none (1, 2) | 53.5 | −1.55 [−2.38, −0.77] | −1.70, −1.40 |
+| minGRU (1, 2) | 55.3 | +0.60 [−0.28, +1.53] | +0.87, +0.33 |
+| GRU (1) | 45.7 | −0.97 [−1.97, +0.07] | −0.97 |
+
+The input alone at tick 239 scores 63.0% (3000 games recorded by none_s1, recall).
+
+- **R1** (minGRU − none) = **+2.15 [1.30, 3.05]**, inside the sealed interval [0, +38] near its low end.
+- **R2** (GRU) = **−0.97**, inside [−2, +38].
+- **No core passes.** The bar was ≥ 10 points over none.
+- Under the sealed rule this probe run is **invalid**: the none placebo is −1.55, outside ±1. The width bias the
+  audit measured (−2 to −3 points for 128 extra dimensions) fits that.
+- Neither reading changes the answer. No memory core kept a reward-relevant fact shown only at the first decision,
+  so this PPO recipe (BC init, 2000 updates, γ 0.995, λ 0.95) does not learn memory over ~240 decisions.
