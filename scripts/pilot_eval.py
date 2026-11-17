@@ -20,7 +20,8 @@ def main():
     res = [run((["PPO", "FairValue", "Bayesian", "MarketMaker"], g, a.ckpt)) for g in range(a.game_offset, a.game_offset + a.games)]
     p = [r["PPO@0"][0] for r in res]
     out = dict(profit=round(st.mean(p), 2), ci95=round(1.96 * st.stdev(p) / len(p) ** .5, 2), games=len(p), game_offset=a.game_offset,
-               matchup="vs FV + Bayes + MM")
+               matchup="vs FV + Bayes + MM",
+               per_game=p)
     json.dump(out, open(a.out, "w"))
 
 
