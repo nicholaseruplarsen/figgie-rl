@@ -21,6 +21,15 @@ compute. Results from runs flagged exploratory never resolve a prediction.
 | 5117 | 16 Nov 16:17 | R1 recall: Δ_cond(minGRU) − Δ_cond(none), cue at first decision | +15 [0, +38] | controlled_probe_v2@ffc5a04797f0 | recall/recall_final/recall_probe/summary.json `memory.diff` |
 | 5118 | 16 Nov 16:17 | R2 recall: Δ_cond(GRU) | +10 [−2, +38] | same | same file, `groups.gru.delta_cond` |
 | 5119 | 16 Nov 16:17 | H1 supervised sequence GRU − last-input probe, 10000 E0 games | +1 [−1, +6] | same | recall/recall_final/hsuff/summary.json `seq.gain` |
+| 5441 | 17 Nov 02:01 | Causal: oracle − none, $/game | +3 [−1, +10] | causal_eval@bccdb9547894 | causal/final/causal/summary.json `oracle_minus_none.value` |
+| 5442 | 17 Nov 02:01 | Causal: B (frozen encoder) − none, $/game | +1 [−3, +6] | same | `b_minus_none.value` |
+| 5443 | 17 Nov 02:01 | Causal: A (aux 0.1) − GRU, $/game | +0.5 [−3, +5] | same | `a_minus_gru.value` |
+| 5444 | 17 Nov 02:01 | Causal: closure_b | 0.3 [−0.5, 1.2] | same | `closure_b.value` |
+| 5445 | 17 Nov 02:01 | Causal: closure_a | 0.15 [−0.5, 1.0] | same | `closure_a.value` |
+| 5446 | 17 Nov 02:01 | Causal: output probe, B − none, points | +2 [−1, +7] | same | `out_b.value` |
+| 5447 | 17 Nov 02:01 | Causal: output probe, A − GRU, points | +1 [−1, +5] | same | `out_a.value` |
+| 5448 | 17 Nov 02:01 | Causal: state probe, B − none (sanity check) | +8 [+3, +10] | same | `q_b.value` |
+| 5449 | 17 Nov 02:01 | Causal: state probe, A − GRU (sanity check) | +5 [0, +10] | same | `q_a.value` |
 
 The 90% intervals and medians are the plan's. The quartiles were interpolated when sealing; they
 are in `runs/prereg-final/*_sealed.json`.
@@ -72,7 +81,7 @@ The audit used `scripts/probe_audit.py` on the 11 E0 nets and 3000 games. Every 
 
 Nothing is pending. R1, R2 and H1 were sealed at 16:17 UTC, before the recall job launched.
 
-## Causal test of the learning-failure hypothesis (to be sealed before job launch)
+## Causal test of the learning-failure hypothesis (sealed as #5441–5449 before launch)
 
 H1 showed that the public history holds about 10 points of goal-suit information that the PPO cores' states do not
 use. One explanation is a learning failure: supervised training gets a dense label, PPO only a sparse reward. This
