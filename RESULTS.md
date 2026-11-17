@@ -1,11 +1,37 @@
 # Results
 
+## Memory agents: results so far (17 Nov 2026)
+
+The midterm report is [`assignments/midterm/figgie_midterm.pdf`](assignments/midterm/figgie_midterm.pdf) (source `figgie_midterm.tex`, by Nicholas Erup Larsen and Adriaan Van der Berg). The full ledger of sealed predictions, deviations and results is [`docs/PREREG_FINAL.md`](docs/PREREG_FINAL.md), and the post-mortem of #699 is [`docs/POSTMORTEM_699.md`](docs/POSTMORTEM_699.md).
+
+### Sealed memory-agent predictions
+
+Two blind probe predictions were sealed before the results were seen, and both missed. For the transformer (#699), the prediction was 48–58% goal-suit probe accuracy at tick 239, and we observed 44.8% (seeds 45.6 and 44.0). For minGRU (#705), the prediction was 43–52%, and we observed 58.0% (57.7 and 58.3). The scores come from `runs/memory/prereg/*.json`.
+
+### The probe was measuring input features, not learned belief
+
+On one common set of 3000 trajectories, untrained random-init networks of every core probe at 59–60%, the same as the current input alone (60.1%). Every trained agent probes lower. Trained minus random-init, averaged over seeds 0 and 1, is −6.1 points for none, −5.9 for minGRU, −15.7 for GRU and −14.1 for the transformer (`runs/memory-diag/transformer_s1/common_probe.json`). The midterm probe therefore cannot show that memory helps.
+
+### Controlled probe (E0, exploratory)
+
+The controlled probe conditions on the input. Under the v1 evaluator, minGRU beats none by +1.04 points. With the regularisation chosen by nested CV instead of fixed at C = 1, the gap shrinks to about +0.35, and against a same-width shuffled control the three cores score none +2.73, minGRU +2.39 and GRU +1.48 (probe audit, job 489626d0). "Memory helps" is not shown.
+
+### H-suff refuted (#5119)
+
+The public trade history does contain information beyond the last input. A GRU trained supervised on the whole input sequence (10,000 E0 games) reaches 73.54% on the goal suit, against 63.72% for a probe of the last input. The gain is +9.82 points [8.97, 10.66], above the sealed interval [−1, +6]. The label-permuted placebo gave +0.71 [−0.30, +1.67], so the control passed. The width penalty costs the PPO cores up to 2–3 points, so the true supervised-vs-PPO gap is about 5–8 points. On the same games, trained PPO memory recovers only about 1 point (minGRU over none +1.18 [0.81, 1.58]). The supervised GRU (about 30k parameters) is smaller than either PPO memory core, so capacity does not explain the gap.
+
+### Pending
+
+The causal test of the learning-failure hypothesis (sealed as #5441–5449, job ef7318b2) is running. It compares none, an oracle with the goal suit in its input, a frozen supervised encoder and an aux-loss GRU on $/game, so its result is pending. The recall check (#5117, #5118) is reported as invalid because its placebo failed. E1, the tuner and optimizer grid, is in progress, with the rented cells finishing about 18–19 Nov and the compute-01 cells about 23 Nov. P1–P7 wait on E1 and E2.
+
+## Engine, replication and PPO baselines
+
 Everything here comes from the shared engine in `figgie/engine.py` (standard
 rules; CS224R discretisation: 240 ticks, 257 actions, prices 1–30, every
 trade wipes the book). Guessed details are listed in [DESIGN.md](DESIGN.md).
 Raw numbers are in `results/`; trained checkpoints are in `checkpoints/`.
 
-## 1. Replication fidelity per source
+### 1. Replication fidelity per source
 
 | Source | What was checked | Result |
 |---|---|---|
@@ -33,7 +59,7 @@ acts per step, so a player gets about 60 turns, unevenly spread. On the
 shared engine everyone acts every tick. The decision check above shows the
 logic itself is identical.
 
-## 2. CS224R reproduction
+### 2. CS224R reproduction
 
 **Baseline tournament** (fixed seats; §5, Fig. 1 of the report):
 
@@ -74,7 +100,7 @@ up to $30, so it loses about $200 per game and is much easier to farm. The repor
 probably milder; the report does not say. Training 2000 instead of 300 updates
 adds little (+1–2 $/game).
 
-## 3. Tournament: everyone vs everyone
+### 3. Tournament: everyone vs everyone
 
 `scripts/tournament.py`, 4000 tables. Each table draws 4 distinct agents at
 random and plays one deal under all 4 seat rotations (duplicate format), so
@@ -123,7 +149,7 @@ is last at −198 ± 6.5 $/game. The no-info ConstVal control jumps to +31.8,
 level with Bayesian, because a constant $8.8 quote farms the random agents. This
 is the same price-level effect the Figgie-bot README describes.
 
-## 4. Takeaways
+### 4. Takeaways
 
 - No agent dominates. Four agents from three sources are statistically tied
   around +15 to +22 $/game: figment's Bayesian market makers, CS224R's
@@ -139,7 +165,7 @@ is the same price-level effect the Figgie-bot README describes.
 - Lifting matters. The PPO variants without lift targeting (v1, no-BC) rank
   11th and 19th; the v2 variants rank 4th–5th.
 
-## 5. Caveats
+### 5. Caveats
 
 - This is not an equilibrium analysis. Exploitability is undefined for
   4-player general-sum games, and all numbers depend on the field. PPO was
@@ -156,7 +182,7 @@ is the same price-level effect the Figgie-bot README describes.
 - Figgie-bot's ports keep that repo's non-standard prior (goal suit 8 vs 10
   cards with probability ½ each).
 
-## Reproduce
+### Reproduce
 
 ```
 python scripts/verify_ports.py 800        # needs third_party/ clones (see README)
