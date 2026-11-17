@@ -107,7 +107,16 @@ def new_net(args):
 
 
 def feat_kind(args):
-    return "recall" if getattr(args, "recall", False) else args.flow
+    if getattr(args, "recall", False):
+        return "recall"
+    if getattr(args, "encoder", None):
+        return "enc:" + os.path.abspath(args.encoder)
+    return getattr(args, "feat", None) or args.flow
+
+
+def net_feat(kind):
+    """The feature kind a policy needs at play time (the aux label channel is training-only)."""
+    return None if kind in (True, False, "recall", "aux", "aux_placebo") else kind
 
 
 def pad_input(net, d):
@@ -188,10 +197,18 @@ def ppo(args):
         net = load_net(args.init) if args.init else new_net(args)
         if feat_kind(args) == "recall":
             net = pad_input(net, RECALL_DIM)
+        elif net_feat(feat_kind(args)):         # causal test: oracle or frozen-encoder input, BC init widened
+            net = pad_input(net, obs_dim(feat_kind(args)))
+            net.config["feat"] = net_feat(feat_kind(args))
+    aux = feat_kind(args) in ("aux", "aux_placebo")
+    assert not aux or args.opt == "adam", "the aux loss is wired for the adam recipe only"
     assert net.arch == args.arch and net.config["obs_dim"] == obs_dim(feat_kind(args)), net.config
     net = net.to(dev)
+    # Causal test, arm A: a goal-suit head on the core output, trained with cross-entropy at every decision.
+    aux_head = torch.nn.Linear(net.hidden, 4).to(dev) if aux else None
+    params = list(net.parameters()) + (list(aux_head.parameters()) if aux else [])
     if args.opt == "adam":                      # the recipe so far (PPO-v2 and the memory runs)
-        opt = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
+        opt = torch.optim.Adam(params, lr=args.lr, eps=1e-5)
     else:                                       # shared tsinghua-rl iig/tune factory (E1/E2 arms)
         if args.iig_path:
             sys.path.insert(0, args.iig_path)
@@ -211,6 +228,7 @@ def ppo(args):
     for upd in range(first + 1, args.updates + 1):
         t0 = time.time()
         Xs = torch.zeros(T, B, D, device=dev)
+        Ls = torch.zeros(T, B, dtype=torch.long, device=dev)        # aux labels (arm A only)
         Ms = torch.zeros(T, B, 257, dtype=torch.bool, device=dev)
         As = torch.zeros(T, B, dtype=torch.long, device=dev)
         LPs, Vs, Rs = (torch.zeros(T, B, device=dev) for _ in range(3))
@@ -222,6 +240,8 @@ def ppo(args):
         with torch.no_grad():
             for t in range(T):
                 X, M = torch.from_numpy(Xc).to(dev), torch.from_numpy(Mc).to(dev)
+                if aux:
+                    Ls[t], X = X[:, D].long(), X[:, :D]
                 h = h * (1 - start).unsqueeze(-1)
                 Ds[t] = start
                 if t % args.chunk == 0:
@@ -236,7 +256,7 @@ def ppo(args):
                 for info in new:
                     infos.append(info)
                     pool.record(info)
-            Xl, Ml = torch.from_numpy(Xc).to(dev), torch.from_numpy(Mc).to(dev)
+            Xl, Ml = torch.from_numpy(Xc[:, :D]).to(dev), torch.from_numpy(Mc).to(dev)
             _, v_last, _ = net.step(Xl, h * (1 - start).unsqueeze(-1), Ml)
         # GAE; Ds[t+1]==1 means step t ended its episode.
         adv = torch.zeros(T, B, device=dev)
@@ -250,7 +270,7 @@ def ppo(args):
         ret = adv + Vs
         net.train()
         chunks = list(range(0, T, args.chunk))
-        stats = dict(pg=0.0, vf=0.0, ent=0.0, n=0)
+        stats = dict(pg=0.0, vf=0.0, ent=0.0, n=0, **(dict(aux=0.0, aux_acc=0.0) if aux else {}))
         for _ in range(args.epochs):
             random.shuffle(chunks)
             for k, c0 in enumerate(chunks):
@@ -264,11 +284,17 @@ def ppo(args):
                 pg = -torch.min(ratio * ad, ratio.clamp(1 - args.clip, 1 + args.clip) * ad).mean()
                 vf = 0.5 * (v - ret[sl]).pow(2).mean()
                 ent = dist.entropy().mean()
-                loss = (pg + args.vf * vf - args.ent * ent) / args.accum
-                loss.backward()
+                loss = pg + args.vf * vf - args.ent * ent
+                if aux:
+                    al = aux_head(net.last_z)
+                    ax = torch.nn.functional.cross_entropy(al.reshape(-1, 4), Ls[sl].reshape(-1))
+                    loss = loss + args.aux_coef * ax
+                    stats["aux"] += ax.item()
+                    stats["aux_acc"] += (al.argmax(-1) == Ls[sl]).float().mean().item()
+                (loss / args.accum).backward()
                 stats["pg"] += pg.item(); stats["vf"] += vf.item(); stats["ent"] += ent.item(); stats["n"] += 1
                 if (k + 1) % args.accum == 0 or k == len(chunks) - 1:
-                    torch.nn.utils.clip_grad_norm_(net.parameters(), args.max_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(params, args.max_grad_norm)
                     opt.step()
                     opt.zero_grad()
         if upd > args.warmup and upd % args.snap_every == 0:
@@ -296,6 +322,10 @@ def main():
     p.add_argument("--arch", choices=["none", "mingru", "gru", "transformer"], default="gru")
     p.add_argument("--flow", action="store_true", help="85-dim observation with per-opponent trade flow")
     p.add_argument("--recall", action="store_true", help="recall check: --flow plus a goal-suit cue at the first decision only (89 dims)")
+    p.add_argument("--feat", choices=["oracle", "oracle_placebo", "aux", "aux_placebo"],
+                   help="causal test: oracle goal input, or the aux goal-suit loss (with --flow)")
+    p.add_argument("--encoder", help="causal test, arm B: frozen encoder from scripts/train_encoder.py (with --flow)")
+    p.add_argument("--aux-coef", type=float, default=0.1, help="weight of the aux goal-suit loss (--feat aux)")
     p.add_argument("--window", type=int, default=128, help="transformer context in ticks")
     p.add_argument("--device", default="cpu")
     p.add_argument("--resume", action="store_true", help="continue from OUT/latest.pt if present")

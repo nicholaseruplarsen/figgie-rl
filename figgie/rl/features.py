@@ -12,6 +12,9 @@ layout; this layout is a GUESS that uses exactly those ingredients:
 """
 from __future__ import annotations
 
+import functools
+import random
+
 import numpy as np
 
 from ..agents.cs224r import CardCounter
@@ -118,12 +121,98 @@ class RecallFeaturizer(FlowFeaturizer):
         return f
 
 
+ENC_H = 128                     # width of the frozen supervised encoder (causal test, arm B)
+_ENCODERS = {}
+
+
+def load_encoder(path):
+    """A frozen goal-suit GRU encoder from scripts/train_encoder.py: (gru, mu, sd), cached per process."""
+    if path not in _ENCODERS:
+        import torch
+        torch.set_num_threads(1)        # env workers: one thread each
+        d = torch.load(path, map_location="cpu", weights_only=True)
+        gru = torch.nn.GRU(d["in_dim"], d["hidden"], batch_first=True)
+        gru.load_state_dict(d["gru"])
+        _ENCODERS[path] = (gru.eval(), d["mu"].numpy(), d["sd"].numpy())
+    return _ENCODERS[path]
+
+
+class EncoderFeaturizer(FlowFeaturizer):
+    """Causal test, arm B: the flow features plus the hidden state of a frozen supervised GRU that was trained
+    to predict the goal suit from this player's flow-feature history (FLOW_DIM + ENC_H dims)."""
+
+    def __init__(self, obs, r=2.0, path=None):
+        super().__init__(obs, r)
+        import torch
+        self.gru, self.mu, self.sd = load_encoder(path)
+        self.h = torch.zeros(1, 1, self.gru.hidden_size)
+
+    def __call__(self, obs) -> np.ndarray:
+        import torch
+        x = super().__call__(obs)
+        with torch.no_grad():
+            _, self.h = self.gru(torch.from_numpy((x - self.mu) / self.sd).float().view(1, 1, -1), self.h)
+        return np.concatenate([x, self.h.view(-1).numpy()]).astype(np.float32)
+
+
+class OracleFeaturizer(FlowFeaturizer):
+    """Causal test, oracle arm: the flow features plus the true goal suit, one-hot, at every decision.
+    The placebo variant shows a random suit drawn once per game instead."""
+    placebo = False
+
+    def __init__(self, obs, r=2.0):
+        super().__init__(obs, r)
+        self.suit = random.randrange(4) if self.placebo else obs.game.goal
+
+    def __call__(self, obs) -> np.ndarray:
+        f = np.zeros(FLOW_DIM + 4, np.float32)
+        f[:FLOW_DIM] = super().__call__(obs)
+        f[FLOW_DIM + self.suit] = 1.0
+        return f
+
+
+class OraclePlaceboFeaturizer(OracleFeaturizer):
+    placebo = True
+
+
+class AuxFeaturizer(FlowFeaturizer):
+    """Causal test, arm A: the flow features plus one label channel (the goal suit, or a random suit per game
+    for the placebo). The trainer strips the channel before the network sees it and uses it as the
+    auxiliary target, so the policy's input is the plain 85-dim flow observation."""
+    placebo = False
+
+    def __init__(self, obs, r=2.0):
+        super().__init__(obs, r)
+        self.label = random.randrange(4) if self.placebo else obs.game.goal
+
+    def __call__(self, obs) -> np.ndarray:
+        return np.append(super().__call__(obs), np.float32(self.label)).astype(np.float32)
+
+
+class AuxPlaceboFeaturizer(AuxFeaturizer):
+    placebo = True
+
+
+KINDS = {"oracle": OracleFeaturizer, "oracle_placebo": OraclePlaceboFeaturizer,
+         "aux": AuxFeaturizer, "aux_placebo": AuxPlaceboFeaturizer}
+
+
 def make_featurizer(flow):
-    """flow: False (69 dims), True (85, trade flow) or "recall" (89, flow + early goal cue)."""
+    """flow: False (69 dims), True (85, trade flow), "recall" (89, flow + early goal cue), or a causal-test kind:
+    "oracle"/"oracle_placebo" (89), "aux"/"aux_placebo" (85 + label channel), "enc:<path>" (85 + ENC_H)."""
     if flow == "recall":
         return RecallFeaturizer
+    if isinstance(flow, str) and flow.startswith("enc:"):
+        return functools.partial(EncoderFeaturizer, path=flow[4:])
+    if flow in KINDS:
+        return KINDS[flow]
     return FlowFeaturizer if flow else Featurizer
 
 
 def obs_dim(flow):
-    return RECALL_DIM if flow == "recall" else FLOW_DIM if flow else OBS_DIM
+    """Input width of the network for a feature kind (the aux label channel is not an input)."""
+    if flow in ("recall", "oracle", "oracle_placebo"):
+        return FLOW_DIM + 4
+    if isinstance(flow, str) and flow.startswith("enc:"):
+        return FLOW_DIM + ENC_H
+    return FLOW_DIM if flow else OBS_DIM
