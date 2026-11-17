@@ -21,6 +21,15 @@ compute. Results from runs flagged exploratory never resolve a prediction.
 | 5117 | 16 Nov 16:17 | R1 recall: Δ_cond(minGRU) − Δ_cond(none), cue at first decision | +15 [0, +38] | controlled_probe_v2@ffc5a04797f0 | recall/recall_final/recall_probe/summary.json `memory.diff` |
 | 5118 | 16 Nov 16:17 | R2 recall: Δ_cond(GRU) | +10 [−2, +38] | same | same file, `groups.gru.delta_cond` |
 | 5119 | 16 Nov 16:17 | H1 supervised sequence GRU − last-input probe, 10000 E0 games | +1 [−1, +6] | same | recall/recall_final/hsuff/summary.json `seq.gain` |
+| 5441 | 17 Nov 02:01 | Causal: oracle − none, $/game | +3 [−1, +10] | causal_eval@bccdb9547894 | causal/final/causal/summary.json `oracle_minus_none.value` |
+| 5442 | 17 Nov 02:01 | Causal: B (frozen encoder) − none, $/game | +1 [−3, +6] | same | `b_minus_none.value` |
+| 5443 | 17 Nov 02:01 | Causal: A (aux 0.1) − GRU, $/game | +0.5 [−3, +5] | same | `a_minus_gru.value` |
+| 5444 | 17 Nov 02:01 | Causal: closure_b | 0.3 [−0.5, 1.2] | same | `closure_b.value` |
+| 5445 | 17 Nov 02:01 | Causal: closure_a | 0.15 [−0.5, 1.0] | same | `closure_a.value` |
+| 5446 | 17 Nov 02:01 | Causal: output probe, B − none, points | +2 [−1, +7] | same | `out_b.value` |
+| 5447 | 17 Nov 02:01 | Causal: output probe, A − GRU, points | +1 [−1, +5] | same | `out_a.value` |
+| 5448 | 17 Nov 02:01 | Causal: state probe, B − none (sanity check) | +8 [+3, +10] | same | `q_b.value` |
+| 5449 | 17 Nov 02:01 | Causal: state probe, A − GRU (sanity check) | +5 [0, +10] | same | `q_a.value` |
 
 The 90% intervals and medians are the plan's. The quartiles were interpolated when sealing; they
 are in `runs/prereg-final/*_sealed.json`.
@@ -71,6 +80,55 @@ The audit used `scripts/probe_audit.py` on the 11 E0 nets and 3000 games. Every 
 ## To be sealed before their runs
 
 Nothing is pending. R1, R2 and H1 were sealed at 16:17 UTC, before the recall job launched.
+
+## Causal test of the learning-failure hypothesis (sealed as #5441–5449 before launch)
+
+H1 showed that the public history holds about 10 points of goal-suit information that the PPO cores' states do not
+use. One explanation is a learning failure: supervised training gets a dense label, PPO only a sparse reward. This
+test checks whether giving PPO the information, or a dense signal toward it, changes what it does.
+
+- **Arms**, 3 seeds each (1–3), 2000 updates (32.8M steps), BC init, the E0 recipe, all trained fresh in one job:
+  - `none` (baseline).
+  - `oracle`: none with the true goal suit, one-hot, in the input at every decision. This is the upper bound on what
+    goal information is worth.
+  - `b`: none with the hidden state of a frozen supervised GRU encoder (hidden 128) in the input. The encoder is
+    trained on goal suit from flow-feature histories.
+  - `gru` (baseline).
+  - `a`: GRU plus an auxiliary goal-suit cross-entropy head on the core output at every decision, coefficient 0.1.
+- **Games, disjoint by construction.**
+  - Encoder: probe-table indices [10000, 20000), game seeds 60000–69999, recorded by E0 none_s0.
+  - Probes: indices [0, 3000), seeds 50000–52999, recorded by this job's none s1.
+  - $/game: g in [100000, 103000), play seeds 1,100,000–1,102,999.
+  - PPO training: 48-bit seeds drawn from `random.Random(train seed)`, outside these ranges in practice.
+- **Primary measure: $/game** against FairValue, Bayesian and MarketMaker, seats rotated. Seeds are averaged per
+  game, with a 90% bootstrap CI over games.
+  - closure_b = (b − none)/(oracle − none)
+  - closure_a = (a − gru)/(oracle − none)
+- **Secondary measure: the output probe.** A logistic probe on [input, logits, value] at the last tick, minus the
+  input alone, with arm minus baseline. It tests whether the information reaches the decisions.
+- **Sanity check only:** the state probe (controlled_probe_v2's Δ_cond, arm minus baseline). For b it passes almost
+  by construction.
+- **Pass rule.** For arm b or a, the learning-failure claim is supported if all three hold:
+  - closure ≥ 0.5,
+  - the $/game difference has its CI90 above 0,
+  - the output-probe difference has its CI90 above 0.
+
+  If oracle − none has a CI90 that includes 0, goal information is not worth money here, and the verdict is "no
+  incentive", not a pass or a fail.
+- **Single aux coefficient.** Arm a runs at one coefficient, 0.1, chosen before any result. A failed a does not refute
+  aux-loss methods in general, only this setting, and no coefficient sweep follows the results.
+- **Named placebo** (the same driver, `PLACEBO=1` in runs/causal/job.sh): goal labels permuted across games (seed 0)
+  for the encoder, and a random suit per game for the oracle input and the aux target. Each difference must land
+  inside its interval on the unfavourable side, or within ±1.
+- **Evaluator:** `scripts/causal_eval.py`, stamp causal_eval@<commit>, frozen as a code copy in the job dir.
+  Matched-width H1 (`scripts/h1_width.py`, hidden 128) runs in the same job as an exploratory check.
+- **Compute and why it is rented.**
+  - compute-01's six shared threads are full until E1 ends, about 23 Nov (E1 at 4, m2 at 2).
+  - At 4 cpus the test would take about 5 days after that, landing about 28 Nov, after the ~23 Nov midterm.
+  - So one rented box runs it: --gpu auto, about 48 vCPU, 15 runs side by side, about 10–12 h.
+  - Estimate: $2.65 at the measured $4.7 per 1e9 steps, $3.3 with margin. Approved within the $22 stop.
+  - A lease that ends mid-run resumes from latest.pt, weights only (Adam, the PFSP pool and the aux head restart).
+    Any such resume will be reported.
 
 ## Results
 
