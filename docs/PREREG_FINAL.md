@@ -80,8 +80,18 @@ On 10000 E0 games, the supervised sequence GRU reaches 73.54% and the last-input
 **+9.82 points [8.97, 10.66]**. That is above the sealed 90% interval [−1, +6], so **H-suff is refuted**: the public
 history holds about 10 points of goal-suit information beyond the last input. On the same games, trained minGRU
 adds +1.18 [0.81, 1.58] over none (v2; placebo none +0.28, valid). The small memory gain is therefore a learning
-failure, not sufficiency. The platform holds the result at `pending-control` until a placebo runs:
-`scripts/hsuff_placebo.py` (same pipeline, labels permuted).
+failure, not sufficiency: a hypothesis until a causal test (pre-registered separately) supports it.
+
+**Control.** Placebo job 3030a827 (driver `scripts/hsuff_placebo.py` @a8ea46b, scoring code
+controlled_probe_v2.py blob 4ff4cd60, identical to the frozen ffc5a04; goal labels permuted across games, seed 0)
+gives +0.71 [−0.30, +1.67], with chance at 25.3%. The control passed, and #5119 is resolved at +9.82.
+
+**Capacity.** The supervised GRU is 1 layer, hidden 64, on the 85 input features: 29,952 parameters plus a
+260-parameter head. The PPO cores have a 128-wide state on a 27.5k-parameter encoder. The GRUCell adds 99.1k, minGRU
+adds 33.0k, and none adds nothing. The supervised model is narrower and smaller than both memory cores, so capacity
+cannot explain its advantage. Its accuracy comes from its own head, not from a probe on a wide state, so the width
+penalty does not enter H1. That penalty lowers the PPO cores' Δ_cond by up to 2–3 points, so the gap between the
+supervised model and the PPO cores is roughly 5–8 points, not 9.8.
 
 ### R1, R2, the recall check (#5117, #5118), jobs 1b61b9aa and 8c82fa4b, evaluator controlled_probe_v2@ffc5a04797f0
 
@@ -100,7 +110,14 @@ The input alone at tick 239 scores 63.0% (3000 games recorded by none_s1, recall
 - **R1** (minGRU − none) = **+2.15 [1.30, 3.05]**, inside the sealed interval [0, +38] near its low end.
 - **R2** (GRU) = **−0.97**, inside [−2, +38].
 - **No core passes.** The bar was ≥ 10 points over none.
-- Under the sealed rule this probe run is **invalid**: the none placebo is −1.55, outside ±1. The width bias the
-  audit measured (−2 to −3 points for 128 extra dimensions) fits that.
-- Neither reading changes the answer. No memory core kept a reward-relevant fact shown only at the first decision,
-  so this PPO recipe (BC init, 2000 updates, γ 0.995, λ 0.95) does not learn memory over ~240 decisions.
+- Under the sealed rule this probe run is **invalid**: the none placebo is −1.55, outside ±1. It is reported as
+  invalid and not rerun.
+- **Cause of the drift (checked after the run).**
+  - The resume is not the cause: the none runs finished all 2000 updates on the first lease and were never resumed.
+  - The cue is not the cause either: it is shown only at the first decision, and none has no memory, so its features
+    at tick 239 do not depend on it.
+  - Width is what is left. A random-init none net of the same width already scores 62.13 against the input's 63.0.
+    The trained none scores 61.45. In E0, none's trained features made up the width cost; here they do not.
+- **Exploratory, post hoc.** Measured against the same-width random-init net of each core: none −0.68, minGRU
+  +0.60, GRU −0.60, minGRU − none +1.28. No core comes near the bar, but the run does not show that these cores
+  cannot carry the cue.
