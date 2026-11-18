@@ -27,7 +27,7 @@ def start(out, config, prefix_run=""):
         import rsrun
         cfg = {k: (v if isinstance(v, (int, float, str, bool)) or v is None else str(v)) for k, v in config.items()}
         seed = cfg.get("seed") if isinstance(cfg.get("seed"), int) else None
-        name = os.environ.get("FIGGIE_RUN_NAME") or (prefix_run + Path(out).name)
+        name = os.environ.get("FIGGIE_RUN_NAME") or (prefix_run + "-".join(Path(out).resolve().parts[-2:]))
         preds = [p for p in os.environ.get("FIGGIE_PREDICTIONS", "").split(",") if p]
         run = rsrun.init("tsinghua/figgie/" + os.environ.get("FIGGIE_TRACK", "adhoc"), name, config=cfg,
                          predictions=preds, seed=seed, out=Path(out) / "rsrun",
