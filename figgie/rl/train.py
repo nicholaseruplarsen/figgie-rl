@@ -225,7 +225,7 @@ def ppo(args):
     start = torch.ones(B, device=dev)
     os.makedirs(args.out, exist_ok=True)
     logf = open(os.path.join(args.out, "train_log.jsonl"), "a")
-    from figgie import runlog                  # FIGGIE_RSRUN=1: rsrun dir in out/, ingested on wsl2
+    from figgie import runlog                  # FIGGIE_RSRUN=1: rsrun dir in out/, ingested after fetch
     rs = runlog.start(args.out, vars(args))
     for upd in range(first + 1, args.updates + 1):
         t0 = time.time()
