@@ -1,7 +1,7 @@
-"""rsrun logging for Figgie runs (research-mlflow CONVENTIONS v2). Off unless FIGGIE_RSRUN=1.
+"""rsrun logging for Figgie runs (rsrun run-dir format). Off unless FIGGIE_RSRUN=1.
 
 On: rsrun writes <out>/rsrun/{run.json, metrics.jsonl, artifacts/} with git provenance. Boxes never talk to MLflow
-and hold no credentials: the dir comes back with `compute fetch`, then wsl2 runs `rs-ingest <dir>`.
+and hold no credentials: the dir comes back with `compute fetch`, then the home machine runs `rs-ingest <dir>`.
 Never raises: if rsrun is missing or refuses (dirty tree, unpushed commit, no git checkout), it warns and logs nothing.
 Env: FIGGIE_RSRUN=1, FIGGIE_TRACK (experiment tsinghua/figgie/<track>, default adhoc), FIGGIE_RUN_NAME
 (registration id or <ticket>-<short>-s<seed>), FIGGIE_KB_POST (KB post id), FIGGIE_PREDICTIONS (comma ids),
