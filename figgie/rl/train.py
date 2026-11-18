@@ -189,6 +189,8 @@ def ppo(args):
     start = torch.ones(B, device=dev)
     os.makedirs(args.out, exist_ok=True)
     logf = open(os.path.join(args.out, "train_log.jsonl"), "a")
+    from figgie import runlog                  # FIGGIE_RSRUN=1: rsrun dir in out/, ingested on wsl2
+    rs = runlog.start(args.out, vars(args))
     for upd in range(first + 1, args.updates + 1):
         t0 = time.time()
         Xs = torch.zeros(T, B, D, device=dev)
@@ -262,10 +264,12 @@ def ppo(args):
                    pool=len(pool.members), **{k: round(v / n, 4) for k, v in stats.items()})
         print(json.dumps(row), flush=True)
         logf.write(json.dumps(row) + "\n")
+        rs.log(*runlog.metrics(row, "train", "update"))
         logf.flush()
         if upd % 25 == 0 or upd == args.updates:
             save(net, latest, update=upd)     # one rolling checkpoint keeps disk use small
     save(net, os.path.join(args.out, "final.pt"))
+    rs.finish(summary=dict(final_update=upd, ckpt_path=os.path.join(args.out, "final.pt")))
     venv.close()
 
 

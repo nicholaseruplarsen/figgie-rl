@@ -22,6 +22,11 @@ def main():
     out = dict(profit=round(st.mean(p), 2), ci95=round(1.96 * st.stdev(p) / len(p) ** .5, 2), games=len(p), game_offset=a.game_offset,
                matchup="vs FV + Bayes + MM")
     json.dump(out, open(a.out, "w"))
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from figgie import runlog                  # FIGGIE_RSRUN=1: eval summary as an rsrun run beside a.out
+    rs = runlog.start(os.path.splitext(a.out)[0], vars(a), prefix_run="eval-")
+    rs.log({f"eval/{k}": v for k, v in out.items() if k != "per_game"}, step=0)
+    rs.finish(summary={k: v for k, v in out.items() if k != "per_game"})
 
 
 if __name__ == "__main__":
