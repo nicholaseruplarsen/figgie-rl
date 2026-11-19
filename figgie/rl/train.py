@@ -272,7 +272,7 @@ def ppo(args):
         ret = adv + Vs
         net.train()
         chunks = list(range(0, T, args.chunk))
-        stats = dict(pg=0.0, vf=0.0, ent=0.0, n=0, **(dict(aux=0.0, aux_acc=0.0) if aux else {}))
+        stats = dict(pg=0.0, vf=0.0, ent=0.0, kl=0.0, clipfrac=0.0, n=0, **(dict(aux=0.0, aux_acc=0.0) if aux else {}))
         for _ in range(args.epochs):
             random.shuffle(chunks)
             for k, c0 in enumerate(chunks):
@@ -295,6 +295,10 @@ def ppo(args):
                     stats["aux_acc"] += (al.argmax(-1) == Ls[sl]).float().mean().item()
                 (loss / args.accum).backward()
                 stats["pg"] += pg.item(); stats["vf"] += vf.item(); stats["ent"] += ent.item(); stats["n"] += 1
+                with torch.no_grad():  # logging only: approx KL(old||new) and clip fraction, no effect on the update
+                    lr_ = lp - LPs[sl]
+                    stats["kl"] += ((lr_.exp() - 1) - lr_).mean().item()
+                    stats["clipfrac"] += ((ratio - 1).abs() > args.clip).float().mean().item()
                 if (k + 1) % args.accum == 0 or k == len(chunks) - 1:
                     torch.nn.utils.clip_grad_norm_(params, args.max_grad_norm)
                     opt.step()
@@ -306,7 +310,7 @@ def ppo(args):
                    profit=float(np.mean([i["profit"] for i in infos])) if infos else None,
                    win=float(np.mean([i["win"] for i in infos])) if infos else None,
                    lifts=float(np.mean([i["lifts"] for i in infos])) if infos else None,
-                   pool=len(pool.members), **{k: round(v / n, 4) for k, v in stats.items()})
+                   pool=len(pool.members), reward=round(Rs.mean().item(), 5), **{k: round(v / n, 4) for k, v in stats.items()})
         print(json.dumps(row), flush=True)
         logf.write(json.dumps(row) + "\n")
         rs.log(*runlog.metrics(row, "train", "update"))
