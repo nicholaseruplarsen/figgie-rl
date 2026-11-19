@@ -43,6 +43,14 @@ def start(out, config, prefix_run=""):
         return _Off()
 
 
+# train_log.jsonl keys -> tracker names. Counts and timings (episodes, pool size, seconds) are not metrics.
+NAMES = dict(pg="policy_loss", vf="value_loss", ent="entropy", kl="approx_kl", clipfrac="clip_frac",
+             reward="reward_per_step", profit="profit", win="win_rate", lifts="lifts", aux="aux_loss", aux_acc="aux_acc")
+SKIP = {"sec", "episodes", "pool", "games", "n", "seed", "seeds", "n_games"}
+
+
 def metrics(row, prefix, step_key):
-    """Row of a JSONL log -> ({prefix/key: value}, step)."""
-    return {f"{prefix}/{k}": v for k, v in row.items() if k != step_key}, row.get(step_key)
+    """Row of a JSONL log -> ({prefix/name: value}, step), numbers only, meta-counts dropped."""
+    out = {f"{prefix}/{NAMES.get(k, k)}": v for k, v in row.items()
+           if k != step_key and k not in SKIP and isinstance(v, (int, float)) and not isinstance(v, bool)}
+    return out, row.get(step_key)

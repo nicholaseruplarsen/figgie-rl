@@ -25,7 +25,7 @@ def main():
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from figgie import runlog                  # FIGGIE_RSRUN=1: eval summary as an rsrun run beside a.out
     rs = runlog.start(os.path.splitext(a.out)[0], vars(a), prefix_run="eval-")
-    rs.log({f"eval/{k}": v for k, v in out.items() if k != "per_game"}, step=0)
+    rs.log({"eval/profit": out["profit"], "eval/profit_ci95": out["ci95"]}, step=0)
     rs.finish(summary={k: v for k, v in out.items() if k != "per_game"})
 
 
