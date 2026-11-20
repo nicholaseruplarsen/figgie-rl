@@ -249,6 +249,8 @@ class TBayes(E.BeliefBayes):
         self.T = T
 
     def post(self, obs, c):
+        if self.source == "ccid":   # identity check: cc's exact goal marginal through the swap interface
+            return E.reweight(E.deck_posterior(c), goal_posterior(tuple(c)))
         if self.source != "enc" or self.T == 1.0:
             return super().post(obs, c)
         import torch
@@ -273,7 +275,7 @@ def temp_of(path):
 
 def ev_one(job):
     arm, path, table, g = job
-    src = {"cc": "cc", "oracle": "oracle"}.get(arm, "enc")
+    src = {"cc": "cc", "oracle": "oracle", "ccid": "ccid"}.get(arm, "enc")
     T = temp_of(path) if path else 1.0
     ags, me, t = seat(table, g, lambda s: TBayes(src, E.load(path), seed=s, T=T))
     r = play(ags, seed=1_000_000 + g)
@@ -283,7 +285,9 @@ def ev_one(job):
 def cmd_eval(a):
     f = a.fit
     arms = {"cc": None, "enc": a.enc0, "enc_T": f"{f}/enc_T.pt", "mix": f"{f}/mix.pt", "mix_T": f"{f}/mix_T.pt",
-            "ccs_T": f"{f}/ccs_T.pt", "perm_T": f"{f}/perm_T.pt", "oracle": None}
+            "ccs_T": f"{f}/ccs_T.pt", "perm_T": f"{f}/perm_T.pt", "oracle": None, "ccid": None}
+    if a.only:
+        arms = {k: v for k, v in arms.items() if k in a.only.split(",")}
     gs = list(range(a.offset, a.offset + a.games))
     prof = {}
     with Pool(a.workers) as p:
@@ -294,6 +298,15 @@ def cmd_eval(a):
             for k in ("cc", "mix_T"):
                 prof[f"A_{k}"] = np.array(p.map(ev_one, [(k, arms[k], "A", g) for g in held], chunksize=20))
     ev = f"{EVALUATOR}@{os.environ.get('CODE_COMMIT', 'unknown')[:12]}"
+    if a.only:
+        out = {"evaluator": ev, "games": a.games, "offset": a.offset,
+               "mean": {k: round(float(v.mean()), 3) for k, v in prof.items()}}
+        for k in prof:
+            if k != "cc":
+                d = prof[k] - prof["cc"]
+                out[f"{k}_minus_cc"] = {"value": round(float(d.mean()), 4), "ci90": E.ci90(d),
+                                        "games_differing": int((np.abs(d) > 1e-9).sum())}
+        json.dump(out, open(a.out, "w"), indent=1); print(json.dumps(out)); return
 
     def diff(x, y):
         d = prof[x] - prof[y]
@@ -336,6 +349,7 @@ def main():
     e.add_argument("--fit", required=True); e.add_argument("--enc0", required=True)
     e.add_argument("--offset", type=int, required=True); e.add_argument("--games", type=int, required=True)
     e.add_argument("--held-offset", type=int, default=None)
+    e.add_argument("--only", default=None, help="comma list of arms; skips the full report (e.g. cc,ccid)")
     e.add_argument("--workers", type=int, default=2); e.add_argument("--out", required=True)
     a = ap.parse_args()
     {"fit": cmd_fit, "eval": cmd_eval}[a.cmd](a)
