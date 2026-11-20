@@ -109,6 +109,8 @@ def main():
                 assert all(abs(g["params"][k] - p[k]) <= 1e-12 * max(1, abs(p[k])) for k in p), "replay params differ"
             queue += got
         elif row["kind"] == "tell":
+            if row["id"] in {d["id"] for d in done}:   # a tell written twice (log race): count it once
+                continue
             t = next(q for q in queue if q["id"] == row["id"])
             tuner.tell(t, row["score"], row["cost_steps"])
             t.update(row)
@@ -123,8 +125,9 @@ def main():
         return sum(t["cost_steps"] for t in done) + sum(r["trial"]["cost_steps"] for r in running.values())
 
     running = {}                                     # pid -> trial
+    stopping = False
     while True:
-        while len(running) < a.batch and time.time() - t_start < a.max_hours * 3600:
+        while not stopping and len(running) < a.batch and time.time() - t_start < a.max_hours * 3600:
             if not queue:
                 if used() >= a.budget:
                     break
@@ -149,6 +152,9 @@ def main():
             continue
         rc = os.waitstatus_to_exitcode(status)
         t = r["trial"]
+        if rc < 0:                                   # killed by a signal (lease end): not a result, rerun next lease
+            stopping = True
+            continue
         cpu = ru.ru_utime + ru.ru_stime
         if r["stage"] == "train":
             t["train_rc"], t["train_wall_s"], t["train_cpu_s"] = rc, round(time.time() - r["t0"], 1), round(cpu, 1)
