@@ -133,6 +133,10 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
     its EMA win rates and the aux head, and a resume restores all of them. Each resume writes a row
     `resumed: true, resumed_at_update: N` to the run's train_log.jsonl. E1 copies it into the trial's row in
     trials.jsonl, so the ledger shows which trials resumed and where.
+  - Resume proof (compute-01, 2026-11-20): a CPU run was killed with SIGTERM at update 60 and resumed from latest.pt
+    at update 50 with full state (optimizer present, PFSP pool of 16 with its win rates, pool_next_id 49). Updates
+    then ran on to 200. A smoke E1 cell was killed after 2 tells and rerun: tells 0-4 were each recorded once and none
+    were null.
 
 ## Standing rules
 
