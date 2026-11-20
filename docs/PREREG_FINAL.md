@@ -127,8 +127,18 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
   - At 4 cpus the test would take about 5 days after that, landing about 28 Nov, after the ~23 Nov midterm.
   - So one rented box runs it: --gpu auto, about 48 vCPU, 15 runs side by side, about 10–12 h.
   - Estimate: $2.65 at the measured $4.7 per 1e9 steps, $3.3 with margin. Approved within the $22 stop.
-  - A lease that ends mid-run resumes from latest.pt, weights only (Adam, the PFSP pool and the aux head restart).
-    Any such resume will be reported.
+  - A lease that ends mid-run resumed from latest.pt, weights only (Adam, the PFSP pool and the aux head
+    restarted). Any such resume will be reported. This held for every run up to 2026-11-20.
+  - From 2026-11-20 (judea/e1-resume), latest.pt also holds the optimizer state (Adam or Muon), the PFSP pool with
+    its EMA win rates and the aux head, and a resume restores all of them. Each resume writes a row
+    `resumed: true, resumed_at_update: N` to the run's train_log.jsonl. E1 copies it into the trial's row in
+    trials.jsonl, so the ledger shows which trials resumed and where.
+
+## Standing rules
+
+- **No seal without a pilot (from 2026-11-20).** A quantity can be sealed only if a pilot has measured it first.
+  The pilot value, its job id and its game or seed range go into this file before the seal. The pilot range must
+  be disjoint from the sealed range. Prompted by the belief-v2 placebo, whose sealed form would have failed.
 
 ## Results
 
