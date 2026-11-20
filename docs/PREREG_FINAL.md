@@ -179,3 +179,21 @@ The input alone at tick 239 scores 63.0% (3000 games recorded by none_s1, recall
 - **Exploratory, post hoc.** Measured against the same-width random-init net of each core: none −0.68, minGRU
   +0.60, GRU −0.60, minGRU − none +1.28. No core comes near the bar, but the run does not show that these cores
   cannot carry the cue.
+
+## Belief value v2 (scripts/belief_v2.py, not yet sealed)
+
+**Design change before the seal, made after pilot 1 and prompted by its failed placebo (2026-11-20).**
+- Pilot 1 (job f7f04b27, 300 games on table E at offset 100500, belief_v2@91f75656b170) was exploratory.
+  - Its placebo trained on one hard label per game, drawn from the trader's final-tick card-count posterior.
+  - The placebo lost 12.8 $/game against cc [−19.4, −6.4], which fails the ±1 gate.
+  - On validation games the placebo was calibrated (ECE ≤ 0.025 after its temperature, T = 6.31).
+  - It was only 35–38% right, against cc's 41–50%. It carried less information than the cc belief it replaces, so it
+    was not a fair null.
+- The new placebo (ccs_T) trains on cc's own per-tick goal posterior as soft targets. Its temperature is fitted by
+  soft cross-entropy on the same validation games as the other arms.
+- Pilot 2 runs on fresh games 105000–105299. These are disjoint from pilot 1 (100500–100799), the temperature-fit
+  range (104000–104499) and the sealed ranges (110000–112999 and 120000–122999).
+- Every arm and cc are scored on the same games. The run also logs accuracy and ECE per tick on table E for every
+  encoder.
+- Gate: ccs_T − cc must lie within ±1 $/game. If it fails again, the test stops and is reported. There is no second
+  redesign.
