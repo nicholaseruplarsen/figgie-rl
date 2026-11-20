@@ -216,18 +216,17 @@ def ppo(args):
         opt, split = make_optimizer(net, args.opt, args.lr, eps=1e-5)
         print(json.dumps(dict(optimizer=args.opt, split=[(r["name"], r["group"]) for r in split])), flush=True)
     pool = Pool(p_sp=args.p_sp, net_config=net.config)
-    state_path = os.path.join(args.out, "latest_state.pt")
-    if first and os.path.exists(state_path):
-        st = torch.load(state_path, map_location="cpu", weights_only=True)
-        if st.get("update") == first:            # only a state written with this latest.pt
+    resumed = False
+    if first:
+        st = torch.load(latest, map_location="cpu", weights_only=True)
+        if "opt" in st:                          # latest.pt from this version: optimizer, pool and aux head inside
             opt.load_state_dict(st["opt"])
             pool.members = [[int(i), sd, float(w)] for i, sd, w in st["pool"]]
             pool.next_id = int(st["pool_next_id"])
             if aux and st.get("aux_head"):
                 aux_head.load_state_dict(st["aux_head"])
-            print(json.dumps(dict(resumed_state=dict(update=first, pool=len(pool.members)))), flush=True)
-        else:
-            print(json.dumps(dict(resumed_state=None, reason="latest_state.pt is from another update")), flush=True)
+            resumed = True
+        print(json.dumps(dict(resumed_state=dict(update=first, full=resumed, pool=len(pool.members)))), flush=True)
     venv = VecEnv(args.envs, args.procs, args.seed,
                   dict(beta=args.beta, gamma=args.gamma, lift_alpha=args.lift_alpha, flow=feat_kind(args)),
                   dict(p_sp=args.p_sp, net_config=net.config), start=args.mp_start)
@@ -237,6 +236,8 @@ def ppo(args):
     start = torch.ones(B, device=dev)
     os.makedirs(args.out, exist_ok=True)
     logf = open(os.path.join(args.out, "train_log.jsonl"), "a")
+    if first:                                  # the ledger records every resume and where it resumed
+        logf.write(json.dumps(dict(update=first, resumed=True, resumed_at_update=first, full_state=resumed)) + "\n"); logf.flush()
     from figgie import runlog                  # FIGGIE_RSRUN=1: rsrun dir in out/, ingested after fetch
     rs = runlog.start(args.out, vars(args))
     upd = first                                # a resumed run already at --updates goes straight to final.pt
@@ -329,12 +330,9 @@ def ppo(args):
         rs.log(*runlog.metrics(row, "train", "update"))
         logf.flush()
         if upd % 25 == 0 or upd == args.updates:
-            # State first, then weights: a crash between the two leaves a state that latest.pt's update rejects.
-            torch.save(dict(update=upd, opt=opt.state_dict(), pool=[list(m) for m in pool.members],
-                            pool_next_id=pool.next_id, aux_head=aux_head.state_dict() if aux else None),
-                       state_path + ".tmp")
-            os.replace(state_path + ".tmp", state_path)
-            save(net, latest + ".tmp", update=upd)     # one rolling checkpoint keeps disk use small
+            # One rolling checkpoint: weights, Adam/Muon state, PFSP pool with its EMA win rates, aux head.
+            save(net, latest + ".tmp", update=upd, opt=opt.state_dict(), pool=[list(m) for m in pool.members],
+                 pool_next_id=pool.next_id, aux_head=aux_head.state_dict() if aux else None)
             os.replace(latest + ".tmp", latest)
     save(net, os.path.join(args.out, "final.pt"))
     rs.finish(summary=dict(final_update=upd, ckpt_path=os.path.join(args.out, "final.pt")))
