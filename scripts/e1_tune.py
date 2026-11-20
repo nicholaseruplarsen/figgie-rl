@@ -11,7 +11,9 @@ proposing once finished + running steps reach --budget (B_F = 8e8). Up to --batc
 once; finished trials are told to the tuner as soon as a batch completes.
 
 Resumable: trials.jsonl is replayed through a fresh tuner with the same seed (asks are
-deterministic given the history), so a lease that ends mid-cell loses only the running trials.
+deterministic given the history). A trial that was running when a lease ended is rerun in the same
+directory with --resume, so it continues from its last checkpoint (weights, optimizer and PFSP pool,
+every 25 updates) instead of restarting.
 
     python scripts/e1_tune.py --core none --tuner protein --opt muon --init bc.pt --iig iig_pin \
         --out out/none-protein-muon --batch 3
@@ -38,7 +40,7 @@ def train_cmd(a, t, d):
     upd = int(round(t["cost_steps"] / a.steps_per_update))
     cmd = [sys.executable, "-m", "figgie.rl.train", "ppo", "--arch", a.core, "--flow", "--seed", str(a.train_seed),
            "--device", "cpu", "--init", a.init, "--lift-alpha", "0.1", "--updates", str(upd),
-           "--procs", "2", "--threads", "1", "--out", d, "--opt", a.opt, "--iig-path", a.iig]
+           "--procs", "2", "--threads", "1", "--out", d, "--opt", a.opt, "--iig-path", a.iig, "--resume"]
     for k, v in t["params"].items():
         cmd += [FLAGS[k], f"{v:.6g}"]
     return cmd + a.extra
@@ -136,7 +138,7 @@ def main():
             t = queue.pop(0)
             d = os.path.join(a.out, f"trial_{t['id']:03d}")
             os.makedirs(d, exist_ok=True)
-            f = open(d + ".train.log", "w")
+            f = open(d + ".train.log", "a")            # a rerun trial resumes from its latest.pt
             pr = subprocess.Popen(train_cmd(a, t, d), stdout=f, stderr=subprocess.STDOUT, cwd=ROOT)
             running[pr.pid] = dict(trial=t, dir=d, t0=time.time(), stage="train", pr=pr)
         if not running:
@@ -162,7 +164,7 @@ def main():
             score = e.get("profit")
             t["score_ci95"] = e.get("ci95")
         for fn in os.listdir(r["dir"]):              # keep final.pt, drop intermediate snapshots
-            if fn.startswith("update_") and fn.endswith(".pt"):
+            if (fn.startswith("update_") and fn.endswith(".pt")) or fn == "latest_state.pt":
                 os.remove(os.path.join(r["dir"], fn))
         tuner.tell(t, score, t["cost_steps"])
         t["score"] = score
