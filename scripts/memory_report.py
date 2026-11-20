@@ -106,7 +106,7 @@ def anomalies(runs, roots, updates):
             ups = [json.loads(l)["update"] for l in log.read_text().splitlines() if l.strip()]
             resumes = sum(1 for a, b in zip(ups, ups[1:]) if b <= a)
             if resumes:
-                notes.append(f"{d.name}: resumed {resumes}x from latest.pt (Adam state and self-play pool reset)")
+                notes.append(f"{d.name}: resumed {resumes}x from latest.pt (full state restored when the row says full_state, else weights only)")
             if (d / "DONE").exists() and ups and max(ups) < updates:
                 notes.append(f"{d.name}: cut short at {max(ups)} of {updates} updates")
     return notes
