@@ -170,13 +170,17 @@ def main():
             score = e.get("profit")
             t["score_ci95"] = e.get("ci95")
         for fn in os.listdir(r["dir"]):              # keep final.pt, drop intermediate snapshots
-            if (fn.startswith("update_") and fn.endswith(".pt")) or fn == "latest_state.pt":
+            if (fn.startswith("update_") and fn.endswith(".pt")) or fn == "latest.pt":
                 os.remove(os.path.join(r["dir"], fn))
+        tl = os.path.join(r["dir"], "train_log.jsonl")          # resumes of this trial, from its train log
+        res = [json.loads(l) for l in open(tl) if '"resumed"' in l] if os.path.exists(tl) else []
+        t["resumed"], t["resumed_at"] = bool(res), [x["resumed_at_update"] for x in res]
         tuner.tell(t, score, t["cost_steps"])
         t["score"] = score
         row = dict(kind="tell", id=t["id"], score=score, cost_steps=t["cost_steps"], params=t["params"],
                    exponents=t["exponents"], **{k: t.get(k) for k in ("train_rc", "train_wall_s", "train_cpu_s",
-                                                                       "eval_rc", "eval_wall_s", "eval_cpu_s", "score_ci95")})
+                                                                       "eval_rc", "eval_wall_s", "eval_cpu_s", "score_ci95",
+                                                                       "resumed", "resumed_at")})
         write(row)
         done.append(t)
 
