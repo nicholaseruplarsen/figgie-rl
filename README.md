@@ -11,6 +11,22 @@ and a mixed-table tournament (P&L with CIs, Elo, TrueSkill).
 | [revilo-25/Figgie-bot](https://github.com/revilo-25/Figgie-bot) | PotMM, HandMM, FlowMM, FixedSpread, Momentum, controls | decisions identical to original |
 | [0xDub/figgie-auto](https://github.com/0xDub/figgie-auto) | Tilt, Spread, Seller, Noisy, PickOff, Hoarder, Mantis | reimplemented, code review only |
 
+## Play
+
+Play a game in the browser against the three most profitable agents from the tournament (`fig.AdaptiveMM`, `fig.BayesianMM`, `Bayesian`):
+
+```bash
+python scripts/play.py
+```
+
+Open the printed URL (http://127.0.0.1:8766). You sit at seat 0. Pick a suit with `1`–`4` or the arrow keys, set the price with `↑`/`↓`, then `b` bid, `a` ask, `l` lift, `h` hit, `c` cancel the suit's quotes, `x` cancel everything. Space pauses and `.` steps one tick. Orders go through `Game.apply` on your turn in the next tick, and the agents see the same `Obs` as in the tournament.
+
+Swap opponents with `--opponents` (any registry name or `PPO-v1`, `PPO-v2`, `PPO-v2-long`, `PPO-noBC`), change the pace with `--tick 0.3`, or start paused with `--paused`. `--reload` restarts the server when a Python file changes, and the page is re-read from `scripts/play_web/index.html` on every load.
+
+```bash
+python scripts/play.py --opponents fig.AdaptiveMM PPO-v2 Bayesian --reload
+```
+
 Results: see [RESULTS.md](RESULTS.md).
 See `DESIGN.md` for rules, every guessed detail, and provenance.
 

@@ -1,0 +1,164 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Figgie</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root { --bg:#f6f5f1; --panel:#fff; --ink:#1d1d1f; --mute:#777; --line:#e2e0da; --red:#c8102e; --black:#1d1d1f; --acc:#2463eb; --good:#16803c; --bad:#b42318; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif; }
+main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:12px; grid-template-columns:1fr 320px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+h2 { margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); }
+.top { grid-column:1/-1; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.bar { flex:1; min-width:160px; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+.bar > div { height:100%; background:var(--acc); }
+.mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,Menlo,monospace; }
+.S,.C { color:var(--black); } .H,.D { color:var(--red); }
+table { width:100%; border-collapse:collapse; }
+td,th { padding:6px 4px; text-align:center; }
+th { font-weight:500; color:var(--mute); font-size:12px; }
+tr.suit { cursor:pointer; border-top:1px solid var(--line); }
+tr.suit.sel { background:#eef3ff; }
+.sym { font-size:22px; }
+.who { color:var(--mute); font-size:11px; display:block; }
+.mine { outline:2px solid var(--acc); border-radius:4px; }
+button { font:inherit; border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 10px; cursor:pointer; }
+button:hover { border-color:#bbb; } button.pri { background:var(--acc); color:#fff; border-color:var(--acc); } button.pri kbd { color:#dbe6ff; border-color:#6d95f0; }
+kbd { font:11px ui-monospace,monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:3px; padding:0 4px; color:var(--mute); }
+.controls { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+input[type=number] { width:64px; font:inherit; padding:5px; border:1px solid var(--line); border-radius:6px; }
+.log { max-height:340px; overflow:auto; font-size:13px; }
+.log div { padding:2px 0; border-bottom:1px dashed var(--line); }
+.ok { color:var(--good); } .rej { color:var(--bad); }
+.hand { display:flex; gap:18px; font-size:26px; }
+.hand span small { font-size:15px; }
+#over { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; }
+#over .card { max-width:640px; width:calc(100% - 32px); }
+.pos { color:var(--good); } .neg { color:var(--bad); }
+@media (max-width:800px) { main { grid-template-columns:1fr; } }
+</style></head>
+<body>
+<main>
+  <div class="card top">
+    <b>Figgie</b>
+    <span class="mono" id="tick"></span>
+    <div class="bar"><div id="prog"></div></div>
+    <span id="status"></span>
+    <button id="pauseBtn" onclick="cmd({cmd:'pause'})">Pause <kbd>space</kbd></button>
+    <button onclick="cmd({cmd:'step'})">Step <kbd>.</kbd></button>
+    <label>s/tick <input type="number" id="speed" step="0.1" min="0.05" onchange="cmd({cmd:'speed',tick_s:this.value})"></label>
+    <button onclick="cmd({cmd:'finish'})" title="fast-forward to the end, you no-op">Finish</button>
+  </div>
+
+  <div style="display:grid; gap:12px">
+    <div class="card">
+      <h2>Your hand</h2>
+      <div class="hand" id="hand"></div>
+      <div class="mono" style="margin-top:6px">Cash <b id="cash"></b> &nbsp; <span style="color:var(--mute)">Opponents' card counts:</span> <span id="counts"></span></div>
+    </div>
+    <div class="card">
+      <h2>Book</h2>
+      <table><thead><tr><th>Suit</th><th>Bid</th><th>Ask</th><th>Last</th><th>Your quotes</th></tr></thead><tbody id="book"></tbody></table>
+      <div class="controls">
+        <span>Suit <b id="selSuit"></b></span>
+        <label>Price <input type="number" id="price" min="1" max="30" value="7"></label>
+        <button class="pri" onclick="order('bid')">Bid <kbd>b</kbd></button>
+        <button class="pri" onclick="order('ask')">Ask <kbd>a</kbd></button>
+        <button onclick="order('lift')">Lift <kbd>l</kbd></button>
+        <button onclick="order('hit')">Hit <kbd>h</kbd></button>
+        <button onclick="order('cancel_bid');order('cancel_ask')">Cancel suit <kbd>c</kbd></button>
+        <button onclick="cmd({cmd:'cancel_all'})">Cancel all <kbd>x</kbd></button>
+      </div>
+      <div style="color:var(--mute); font-size:12px; margin-top:8px">
+        <kbd>1</kbd>–<kbd>4</kbd> or <kbd>s</kbd><kbd>←</kbd><kbd>→</kbd> pick ♠♣♥♦ &nbsp; <kbd>↑</kbd><kbd>↓</kbd> price.
+        Orders apply on your turn in the next tick. Any trade wipes every quote.
+      </div>
+    </div>
+    <div class="card"><h2>Your orders</h2><div class="log mono" id="mylog"></div></div>
+  </div>
+
+  <div style="display:grid; gap:12px; align-content:start">
+    <div class="card"><h2>Trades <span id="ntr"></span></h2><div class="log mono" id="trades"></div></div>
+    <div class="card"><h2>Session score <span id="games"></span></h2><table class="mono" id="score"></table></div>
+  </div>
+</main>
+
+<div id="over"><div class="card">
+  <h2>Game over</h2>
+  <div id="result"></div>
+  <div class="controls"><button class="pri" onclick="cmd({cmd:'new'})">New game <kbd>enter</kbd></button></div>
+</div></div>
+
+<script>
+const SY = ["♠","♣","♥","♦"], SC = "SCHD";
+let st = null, sel = 0;
+const $ = id => document.getElementById(id);
+const suit = s => `<span class="${SC[s]}">${SY[s]}</span>`;
+const nm = p => st.names[p];
+const sgn = x => `<span class="${x >= 0 ? "pos" : "neg"}">${x >= 0 ? "+" : ""}${(+x).toFixed(1)}</span>`;
+
+async function cmd(d) {
+  await fetch("/", {method:"POST", body:JSON.stringify(d)});
+  poll();
+}
+function order(k) {
+  cmd({cmd:k, suit:sel, price:+$("price").value});
+}
+
+function render() {
+  $("tick").textContent = `tick ${st.tick}/${st.ticks}`;
+  $("prog").style.width = (100 * st.tick / st.ticks) + "%";
+  $("status").textContent = st.paused ? "paused" : "";
+  $("pauseBtn").firstChild.textContent = st.paused ? "Resume " : "Pause ";
+  if (document.activeElement !== $("speed")) $("speed").value = st.tick_s;
+  $("hand").innerHTML = st.hand.map((n, s) => `<span>${suit(s)}<small class="mono"> ${n}</small></span>`).join("");
+  $("cash").textContent = st.cash;
+  $("counts").innerHTML = st.counts.slice(1).map((c, i) => `${st.names[i+1]} ${c}`).join(" · ");
+  $("selSuit").innerHTML = suit(sel);
+  const q = (o, mine) => o ? `<span class="${o.who === 0 ? "mine" : ""}">${o.price}</span><span class="who">${nm(o.who)}</span>` : "–";
+  $("book").innerHTML = st.book.map((b, s) => `<tr class="suit ${s === sel ? "sel" : ""}" onclick="sel=${s};render()">
+    <td class="sym">${suit(s)}</td><td class="mono">${q(b.bid)}</td><td class="mono">${q(b.ask)}</td>
+    <td class="mono">${b.last ?? "–"}</td><td class="mono">${b.my_bid || "–"} / ${b.my_ask || "–"}</td></tr>`).join("");
+  $("ntr").textContent = `(${st.n_trades})`;
+  $("trades").innerHTML = st.trades.slice().reverse().map(t =>
+    `<div><span style="color:var(--mute)">${String(t.tick).padStart(3)}</span> ${suit(t.suit)} <b>${t.price}</b> ${nm(t.seller)} → ${nm(t.buyer)}${t.buyer===0||t.seller===0?" ★":""}</div>`).join("");
+  $("mylog").innerHTML = (st.pending ? `<div style="color:var(--mute)">${st.pending} queued…</div>` : "") +
+    st.log.slice().reverse().map(l => `<div><span style="color:var(--mute)">${String(l.tick).padStart(3)}</span> ${l.text} <span class="${l.ok ? "ok" : "rej"}">${l.traded ? "traded" : l.ok ? "ok" : "rejected"}</span></div>`).join("");
+  $("games").textContent = `(${st.games} games)`;
+  $("score").innerHTML = st.names.map((n, i) => `<tr><td style="text-align:left">${n}</td><td>${sgn(st.scores[i])}</td></tr>`).join("");
+  $("over").style.display = st.done ? "flex" : "none";
+  if (st.done) {
+    const r = st.reveal;
+    $("result").innerHTML = `<p>Goal suit ${suit(r.goal)} (${r.sizes[r.goal]} cards). Deck: ${r.sizes.map((n, s) => suit(s) + n).join(" ")}</p>
+      <table class="mono"><tr><th></th>${SY.map((_, s) => `<th>${suit(s)}</th>`).join("")}<th>cash</th><th>profit</th></tr>
+      ${st.names.map((n, i) => `<tr${r.winners.includes(i) ? ' style="font-weight:600"' : ""}><td style="text-align:left">${n}${r.winners.includes(i) ? " 🏆" : ""}</td>
+        ${r.hands[i].map((c, s) => `<td>${c}<span class="who">from ${r.hands0[i][s]}</span></td>`).join("")}<td>${i === 0 ? st.cash : ""}</td><td>${sgn(r.profits[i])}</td></tr>`).join("")}</table>`;
+  }
+}
+
+async function poll() {
+  try { st = await (await fetch("/state")).json(); render(); } catch (e) {}
+}
+setInterval(poll, 150); poll();
+
+document.addEventListener("keydown", e => {
+  if (e.target.id === "speed") return;
+  const k = e.key, p = $("price");
+  if (st && st.done && k === "Enter") return cmd({cmd:"new"});
+  if (k.length === 1 && "1234".includes(k) && e.target !== p) sel = +k - 1;
+  else if (k === "ArrowLeft") sel = (sel + 3) % 4;
+  else if (k === "ArrowRight" || k === "s") sel = (sel + 1) % 4;
+  else if (k === "ArrowUp") p.value = Math.min(30, +p.value + 1);
+  else if (k === "ArrowDown") p.value = Math.max(1, +p.value - 1);
+  else if (k === "b") order("bid");
+  else if (k === "a") order("ask");
+  else if (k === "l") order("lift");
+  else if (k === "h") order("hit");
+  else if (k === "c") { order("cancel_bid"); order("cancel_ask"); }
+  else if (k === "x") cmd({cmd:"cancel_all"});
+  else if (k === " ") cmd({cmd:"pause"});
+  else if (k === ".") cmd({cmd:"step"});
+  else return;
+  e.preventDefault(); if (st) render();
+});
+</script>
+</body></html>
