@@ -1,0 +1,35 @@
+# Shared style for every figure in figgie_combined_nicholas.tex.
+# Plain sans serif, Okabe-Ito colour-blind-safe palette, left/bottom spines only, light grid.
+font.family: sans-serif
+font.sans-serif: DejaVu Sans, Arial, Helvetica
+font.size: 8
+axes.titlesize: 9
+axes.titleweight: bold
+axes.titlelocation: left
+axes.titlepad: 6
+axes.labelsize: 8
+axes.labelcolor: 222222
+axes.edgecolor: 444444
+axes.linewidth: 0.8
+axes.spines.top: False
+axes.spines.right: False
+axes.grid: True
+axes.axisbelow: True
+axes.prop_cycle: cycler('color', ['0072B2', 'D55E00', '009E73', 'E69F00', 'CC79A7', '56B4E9', '666666'])
+grid.color: e6e6e6
+grid.linewidth: 0.6
+xtick.labelsize: 7
+ytick.labelsize: 7
+xtick.color: 444444
+ytick.color: 444444
+xtick.major.width: 0.8
+ytick.major.width: 0.8
+lines.linewidth: 1.6
+lines.markersize: 5
+errorbar.capsize: 2
+legend.fontsize: 7
+legend.frameon: False
+figure.dpi: 150
+savefig.bbox: tight
+savefig.pad_inches: 0.02
+pdf.fonttype: 42
