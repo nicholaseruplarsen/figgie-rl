@@ -1,0 +1,460 @@
+\documentclass{article}
+
+\usepackage[preprint,nonatbib]{neurips_2019}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{float}
+
+\definecolor{navy}{HTML}{1D3557}
+\definecolor{tealc}{HTML}{1F8A8C}
+\definecolor{coral}{HTML}{C0394D}
+\definecolor{slatec}{HTML}{475569}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=navy,
+  citecolor=tealc,
+  urlcolor=navy
+}
+
+\title{Why RL Agents Fail to Use What They Infer in IIGs}
+
+\author{
+  Nicholas Erup Larsen \\
+  Student ID: 2026400695 \\
+  IIIS, Tsinghua University \\
+  \texttt{nglsls26@mails.tsinghua.edu.cn}
+  \And
+  Adriaan Van der Berg \\
+  Student ID: 2026403362 \\
+  IIIS, Tsinghua University \\
+  \texttt{adla26@mails.tsinghua.edu.cn}
+}
+
+\usepackage{pifont}
+\newcommand{\Spade}{\ding{171}}
+\newcommand{\Club}{\ding{168}}
+\newcommand{\Heart}{\textcolor{red!75!black}{\ding{170}}}
+\newcommand{\Diam}{\textcolor{red!75!black}{\ding{169}}}
+\begin{document}
+\raggedbottom
+
+\maketitle
+\suppressfloats[t]
+
+\begin{abstract}
+Reinforcement learning agents acting under hidden information are often judged by whether that information can be decoded from their internal state, on the assumption that an agent which knows more will act better.
+We test this assumption and find it fails: in a multi-agent trading game with a single hidden payoff variable, recurrent PPO agents leave almost all of that variable's value unused, and supplying them with an accurate learned belief barely helps.
+Using linear probes, oracle injection and interventions that hold the belief fixed while changing only how it reaches the policy, we separate the agent's failure to infer from its failure to act.
+The bottleneck is action rather than inference: PPO training weakens what the network encodes, while restructuring the belief-to-policy interface recovers most of the available value both zero-shot and in live training, with only a small gain in probe-measured information.
+Probe accuracy is therefore a poor proxy for usable knowledge in RL, and the interface between belief and policy deserves as much attention as the belief itself.
+
+\end{abstract}
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.78\textwidth]{figs_paper/teaser.pdf}
+  \caption{Probe-measured goal-suit information against profit gain for live-RL PPO agents.}
+  \label{fig:teaser}
+\end{figure}
+
+\section{Introduction}
+\label{sec:intro}
+
+An agent that acts under partial observability has two jobs. It must infer the hidden state from what it sees, and it must turn that inference into good actions. Work on representation learning in RL usually tests only the first job, by training a simple classifier, called a probe, to read the hidden state from the agent's internal memory \cite{alain2016probes,gregor2019belief,mcgrath2022alphazero}. If the probe succeeds, the agent is said to ``know'' the hidden state, and any remaining weakness in its play is blamed on training rather than on knowledge. We test whether probe accuracy is a safe stand-in for what the agent can actually use, and find that it is not (Figure~\ref{fig:teaser}). % √
+
+To investigate this, we study a setting where knowing the hidden state and acting on it can be measured separately. In the four-player trading game Figgie, a single hidden variable decides the payoffs, so we can measure exactly how much that variable is worth, how much of it the agent's network encodes, and how much profit the agent extracts from it. We can also break the chain from hidden variable to belief to action at each link. We reveal the variable to the agent directly, which shows what perfect knowledge is worth. We give it a belief learned by a separate supervised network, which shows whether a good belief is enough. Finally, we keep that belief fixed and change only how it enters the policy, which shows whether the interface is the bottleneck. % √
+
+In Figgie, 40 cards are dealt from one of 12 equally likely decks: one suit has 12 cards, one has 8 and two have 10.
+The goal suit is the same-colour partner of the 12-card suit (\Spade$\leftrightarrow$\Club, \Heart$\leftrightarrow$\Diam), meaning every player must infer it out from their own hand and how others publicly trade, aiming to buy goal cards cheaply before the rest catch on, and before 240 ticks ends the game.
+Each goal card pays its holder \$10 at the end, and the rest of the \$200 pot goes to whoever holds the most goal cards. % √
+
+Published agents~\cite{figment,figgiebot,cs224r2025figgie} update the goal posterior from their own cards and public order flow with hand-written rules, but none learns that inference from data or tests whether it is used well.
+Because the hidden state is tiny, the exact belief is cheap to compute and can be compared with what a network represents.
+
+Knowing is not earning. Each dot in Figure~\ref{fig:teaser} is a PPO agent from one live-RL run, placed by how much goal-suit information a probe reads from its network and by its profit over an agent that sees only card counts (90\% intervals). In the shaded band the same belief is fed in two ways and the networks hold nearly the same information, yet one agent loses money and the other gains about \$25 per game.
+
+Our contributions thus far are:
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+  \item We show that recurrent PPO agents leave almost all the value of the hidden information unused, even though a small supervised network can infer it from the same inputs (Sections~\ref{sec:gap} and~\ref{sec:inference}).
+  \item We show that the bottleneck is acting on the belief rather than forming it: an accurate belief barely helps, while changing only how the belief enters the policy recovers most of the lost value (Sections~\ref{sec:action} and~\ref{sec:interface}).
+  \item We map the limits of this fix, including a collapse against unfamiliar opponents when the agent is rewarded for using its belief (Section~\ref{sec:limits}).
+\end{enumerate}
+
+The lesson for RL is that probes overstate usable knowledge, and that the interface between belief and policy matters as much as the quality of the belief (Section~\ref{sec:discussion}).
+
+
+% =============================================================================
+\section{Setup and Methods}
+\label{sec:setup}
+% =============================================================================
+
+\subsection{Environment}
+We use Figgie, a four-player zero-sum card-trading game in which players post and accept prices in one continuous market \cite{disilvio2025figgie,cs224r2025figgie}. We chose it because one hidden variable, the goal suit, decides almost all of the payoff. That lets us measure what an agent knows about the hidden state in bits and what the knowledge is worth in dollars. Each player sees only its own hand and the public quotes and trades over 240 ticks. Nothing in our analysis depends on Figgie beyond this structure.
+
+\subsection{Agents}
+Our main agent is a recurrent policy trained with proximal policy optimization (PPO) \cite{schulman2017ppo}. It starts from behaviour cloning, follows the recipe of \cite{cs224r2025figgie}, and uses a GRU as its memory. Besides the market state, its input contains 16 hand-crafted features that describe how much each suit is likely to be worth. By default these come from exact card counting. We call them the agent's per-suit value inputs. We also use two scripted traders, a Bayesian trader and an adaptive market maker, whose actions are a fixed function of a belief about the goal suit. Agents play against a fixed table of scripted opponents, a separate table of unseen scripted opponents, or three copies of the PPO agent.
+
+\subsection{Measuring what the agent knows}
+A linear probe is a simple classifier trained to read the goal suit from a network's hidden state. We score it on held-out games and report its accuracy or its mutual information with the goal suit in bits. The goal suit takes four equally likely values, so 2 bits means perfect knowledge. A probe can read information that a network merely passes through from its input \cite{hewitt2019control}. We therefore compare every trained network with an untrained copy of the same architecture and with a probe on the raw input. In the live-RL study the probe's regularization is tuned by cross-validation, and the probe is checked against copies trained on shuffled labels, which should read nothing. As a known-answer test, we hide a synthetic 1-bit signal in the input and check how much of it the probe recovers.
+
+\subsection{Measuring what the agent does with it}
+We give the agent information about the goal suit in four ways and measure the change in profit. The \emph{oracle} reveals the true suit. The second way appends the hidden state of a separately trained supervised network, the \emph{encoder}, to the policy's input as raw features. The third writes the encoder's belief into the existing per-suit value inputs instead. The fourth uses an \emph{opponent-only encoder}, which sees what the other players do but not the agent's own hand, cash and quotes.
+
+To price partial information, we replace the oracle with a noisy signal that carries $I$ bits about the goal suit and is revealed at tick $t$. We fit
+\begin{equation}
+  V(I, t) = V_0 \left(\frac{I}{2}\right)^{\gamma} \left(1 - \frac{t}{240}\right)^{\delta},
+  \label{eq:voi}
+\end{equation}
+where $V_0$ is the value of perfect information at the start of the game, $\gamma$ sets how value grows with information, and $\delta$ sets how fast it decays over the game.
+
+\subsection{Evaluation}
+Every comparison plays both conditions on the same deals, 1,500 to 3,000 per condition, and reports bootstrap 90\% confidence intervals. A \emph{gain} is profit in dollars per game over a matched baseline that differs only in the change being tested. Live-RL agents start from the same weights and train for 400 PPO updates on three seeds. Each main comparison was pre-registered with a 90\% prediction interval and a placebo control before it ran. Appendix~\ref{app:prereg} lists every prediction and outcome, including invalid runs.
+
+% =============================================================================
+\section{Results}
+\label{sec:results}
+% =============================================================================
+
+\subsection{RL agents leave the hidden information unused}
+\label{sec:gap}
+
+How much is the goal suit worth to a trained PPO agent? A great deal. Revealing it at the start of the game adds about \$86 per game (Figure~\ref{fig:voi}). Even a fraction of a bit is worth a large share of that, because the value rises steeply at small amounts of information. A fraction of a bit is already worth a lot. The figure shows measurements for the frozen PPO agent and a scripted trader (90\% CIs, 1,500 paired deals each) with fits of Eq.~\ref{eq:voi}. The curve keeps its shape against unseen opponents but sits lower. Information is also worth less the later in the game it arrives (Appendix Figure~\ref{fig:voitick}). There, one line per amount of information shows the value falling with the reveal tick, and open circles were held out of the fit.
+
+This ceiling is what makes the trained agent's behaviour striking. The agent sees the order flow that carries this information on every tick. Yet, as the next two sections show, almost none of it appears in its profit or in its hidden state.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.62\textwidth]{figs_paper/voi.pdf}
+  \caption{Value of a start-of-game goal-suit signal against its information content.}
+  \label{fig:voi}
+\end{figure}
+
+\subsection{The failure is not inference}
+\label{sec:inference}
+
+Is the goal suit hard to infer from what the agent sees? No. A small supervised network, trained to predict the goal suit from the same input sequence, reaches far higher probe accuracy than a probe on the current input alone (Figure~\ref{fig:activations}). The figure tracks a linear probe at every tick over 300 games (90\% bootstrap bands). In a single example game only the supervised network commits to the true suit (Appendix Figure~\ref{fig:example}), and the raw activations show no pattern readable by eye, which is why we use probes (Appendix Figure~\ref{fig:heatmaps}). The information is in the history, and it can be learned.
+
+PPO does not learn it, and training makes things worse. A probe reads the goal suit less well from the PPO agent's trained network than from its raw input or from an untrained copy of the same network. The same holds for every architecture we tested, a GRU, a minGRU \cite{feng2024mingru}, a Transformer and a network with no memory (Appendix Figure~\ref{fig:mirage}). That comparison uses 3,000 games and two seeds per architecture, so its input baseline differs from Figure~\ref{fig:activations}. Every core knows less after PPO training. We call this the \emph{probe mirage}. A probe on a trained agent seems to show knowledge, but most of what it reads is already present in a random network, and RL training removes some of it. Once probe width is matched, the network without memory does as well as the recurrent ones, so recurrent memory adds nothing that the probe can find.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figs_paper/probe.pdf}
+  \caption{Goal-suit probe accuracy by tick for four networks.}
+  \label{fig:activations}
+\end{figure}
+
+\subsection{The failure is in action}
+\label{sec:action}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\textwidth]{figs_paper/payoff_ladder.pdf}
+  \caption{Profit gain for each way of giving the agent the goal suit.}
+  \label{fig:ladder}
+\end{figure}
+
+If inference is not the bottleneck, does handing the agent a good belief close the gap? Barely. We appended the encoder's hidden state to the PPO agent's input as raw features and retrained it. A probe then reads the goal suit from the policy much better, but profit hardly moves and captures about 3\% of the oracle's value (Figure~\ref{fig:ladder}). The truth is worth a lot, a raw belief almost nothing. In the figure, ``frozen'' agents were not retrained, ``trained'' agents were trained with the change, rows marked * are exploratory pilots, and bars show 90\% CIs. The agent knows much more by the probe's measure and uses almost none of it.
+
+A belief can even cost money. A scripted trader acts as a fixed function of its belief, which takes RL out of the question. Given the true suit, it gains about as much as the oracle gives the PPO agent. Given the encoder's belief, it loses money compared with exact card counting (Figure~\ref{fig:calibration}). Overconfident beliefs lose money. Open circles in the figure are uncalibrated encoders, arrows show temperature scaling, and the retrained encoder was trained at every tick on a mix of opponents. The encoder had been trained only on the last tick of each game, so it was confidently wrong early on, and a change of opponents lowered its accuracy further. In exploratory pilots, temperature scaling \cite{guo2017calibration}, a one-parameter correction for overconfidence, recovers most of the loss. A calibrated neural copy of the card counter still loses a little, which suggests a small cost for any learned belief. A belief that is right on average can be worth less than none if its confidence is wrong, and the actor cannot tell.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.5\textwidth]{figs_paper/calibration.pdf}
+  \caption{Scripted-trader profit against belief calibration error.}
+  \label{fig:calibration}
+\end{figure}
+
+\subsection{Changing only the interface recovers most of the value}
+\label{sec:interface}
+
+If the step from belief to action is the problem, does changing only that step help? Yes, even without retraining the agent. We kept the PPO agent frozen and changed one thing at a time (Figure~\ref{fig:chasm}). Writing the belief into the per-suit value inputs, instead of appending raw features, helps. Training the encoder at every tick instead of only the last helps more, and training it against the same opponents as at evaluation helps again. The last change hides the agent's own hand, cash and quotes from the encoder. Together the four changes recover most of the value that the same information would give if it were handed over directly. Changing only the interface recovers most of the value. In Figure~\ref{fig:chasm} the first bar is the PPO agent retrained with the belief as raw features, the others use the frozen agent over 2,000 paired deals, and the dashed line is the value of the same information handed over directly.
+
+The last change matters because of a feedback loop that we call the self-confounding belief trap. An encoder trained on one agent's games learns to treat that agent's own cards and quotes as evidence about the goal suit. When another agent produces those signals, or the same agent starts acting on the belief, they no longer mean the same thing, and the belief corrupts itself. An encoder that sees only the opponents avoids the loop. The rescue holds for three different traders and when a different agent records the training games (Appendix Figure~\ref{fig:trap}). Hiding the agent's own actions rescues the belief. That figure compares an encoder that sees everything (open) with one that sees only the opponents (filled), for encoders recorded on PPO games and on Bayesian-trader games. An encoder that sees only completed trades, with no quotes, keeps most of the gain, so the effect does not come from scripted opponents revealing their hands through their quotes.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\textwidth]{figs_paper/interface.pdf}
+  \caption{Profit gain as four interface changes are added in turn.}
+  \label{fig:chasm}
+\end{figure}
+
+Could end-to-end training make the interface unnecessary? Not within our budget. We trained six PPO agents from the same starting point (Figure~\ref{fig:teaser}, Table~\ref{tab:e2b}). The agent given the opponent-only encoder as raw features ends slightly below the card-count baseline, although a probe finds a lot of goal-suit information in its network. The agent given the same encoder through its per-suit value inputs more than doubles the baseline's profit, with only slightly more probe-measured information. A placebo that fills the value inputs from the agent's own hand stays near the baseline. After 400 updates, PPO had still not learned the step from a belief to prices that the per-suit inputs provide for free.
+
+\subsection{Limits}
+\label{sec:limits}
+
+Does the fix hold against different opponents? No. The encoder was trained against scripted opponents whose trading gives away their hands. Against three copies of the PPO agent, which give away much less, the agents with the per-suit belief fall below the card-count agent, and the frozen agents with an encoder plugged in fall further (Figure~\ref{fig:selfplay}). Gains against familiar opponents do not transfer. In the figure, dots are agents trained with each input, open diamonds are the frozen agent with an encoder plugged in, and the arrow shows the effect of reward shaping. Rewarding the agent for acting on its belief, through potential-based reward shaping \cite{ng1999shaping}, adds a little against familiar opponents and makes the drop against PPO opponents much worse. The belief helps only while the opponents behave like the ones it was trained on.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.6\textwidth]{figs_paper/selfplay.pdf}
+  \caption{Profit against scripted opponents and against PPO opponents.}
+  \label{fig:selfplay}
+\end{figure}
+
+One causal test failed. In an earlier study we added an auxiliary loss that trained the PPO network to predict the goal suit, to test whether supervising the representation helps. Its placebo, the same loss with shuffled labels, changed profit by more than the pre-set tolerance on all three seeds. We treat that test as invalid rather than as a null result and make no claim about auxiliary losses.
+
+The scope is narrow. All results come from one game with one discrete hidden variable. The live-RL study uses three seeds and 400 updates per agent. Its known-answer probe check fell just short of its pre-set bar, so the probe values in Figure~\ref{fig:teaser} are indicative and probably read low (Appendix~\ref{app:prereg}).
+
+% =============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% =============================================================================
+
+\subsection{Probes overstate usable knowledge}
+Probing shows what a network contains, not what the agent can use. Linear probes are a standard way to ask what a network represents \cite{alain2016probes,belinkov2022probing}, and control tasks were introduced because a probe can find structure that the model does not use \cite{hewitt2019control}. Our results add two cautions for RL. Untrained recurrent networks already pass much of the input through, so a trained agent should be compared with its untrained copy, and in our case RL training lowered what a probe could read. More importantly, what a probe reads and what the agent uses come apart. Two live-RL agents with nearly the same probe-measured information differ widely in profit, and appending a belief raises probe accuracy with almost no change in reward.
+
+\subsection{The interface matters as much as the representation}
+Belief-state methods for partially observable problems \cite{kaelbling1998pomdp} and their deep variants \cite{hausknecht2015drqn,igl2018dvrl} aim to make the agent's state a good belief. Auxiliary losses \cite{jaderberg2017unreal} push the representation toward useful features. Both target the representation. In our setting the representation was not the binding constraint. What mattered was whether the belief arrived in a form the policy could turn into actions, and whether it depended on the agent's own behaviour. A calibrated belief that depends only on the opponents, written into features the policy already acts on, was worth far more than a richer latent. Work on belief-state RL could report the step from belief to action separately, for example with the oracle and fixed-belief interventions we use here.
+
+\subsection{Future work}
+The obvious next step is more games. Other imperfect-information games with a few payoff-relevant hidden variables would test whether the probe mirage and the interface effect hold beyond Figgie. The drop against PPO opponents points to a second direction, beliefs that adapt online to how informative the current opponents are. A third is a valid causal test of auxiliary belief losses, which our invalid test leaves open.
+
+% =============================================================================
+\small
+\begin{thebibliography}{20}
+
+\bibitem{alain2016probes}
+G.~Alain and Y.~Bengio.
+\newblock Understanding intermediate layers using linear classifier probes.
+\newblock \emph{arXiv preprint arXiv:1610.01644}, 2016.
+
+\bibitem{belinkov2022probing}
+Y.~Belinkov.
+\newblock Probing classifiers: Promises, shortcomings, and advances.
+\newblock \emph{Computational Linguistics}, 48(1):207--219, 2022.
+
+\bibitem{cs224r2025figgie}
+D.~Yang.
+\newblock Reinforcement learning for Figgie: Learning negotiation as a first-class skill.
+\newblock Stanford CS224R project report, 2026.
+
+\bibitem{disilvio2025figgie}
+S.~DiSilvio, Y.~Luo, and A.~Ozerov.
+\newblock Traders in a strange land: Agent-based discrete-event market simulation of the Figgie card game.
+\newblock \emph{arXiv preprint arXiv:2110.00879}, 2021.
+
+\bibitem{feng2024mingru}
+L.~Feng, F.~Tung, M.~O. Ahmed, Y.~Bengio, and H.~Hajimirsadeghi.
+\newblock Were RNNs all we needed?
+\newblock \emph{arXiv preprint arXiv:2410.01201}, 2024.
+
+\bibitem{gregor2019belief}
+K.~Gregor, D.~Jimenez Rezende, F.~Besse, Y.~Wu, H.~Merzic, and A.~van~den Oord.
+\newblock Shaping belief states with generative environment models for RL.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2019.
+
+\bibitem{figment} mneha05.
+\newblock figment: a self-play market-making arena for Figgie-style card markets.
+\newblock \url{https://github.com/mneha05/figment}.
+
+\bibitem{figgiebot} revilo-25.
+\newblock Figgie-bot.
+\newblock \url{https://github.com/revilo-25/Figgie-bot}.
+
+\bibitem{guo2017calibration}
+C.~Guo, G.~Pleiss, Y.~Sun, and K.~Q. Weinberger.
+\newblock On calibration of modern neural networks.
+\newblock In \emph{Proceedings of ICML}, pages 1321--1330, 2017.
+
+\bibitem{hausknecht2015drqn}
+M.~Hausknecht and P.~Stone.
+\newblock Deep recurrent Q-learning for partially observable MDPs.
+\newblock In \emph{AAAI Fall Symposium on Sequential Decision Making for Intelligent Agents}, 2015.
+
+\bibitem{hewitt2019control}
+J.~Hewitt and P.~Liang.
+\newblock Designing and interpreting probes with control tasks.
+\newblock In \emph{Proceedings of EMNLP-IJCNLP}, pages 2733--2743, 2019.
+
+\bibitem{igl2018dvrl}
+M.~Igl, L.~Zintgraf, T.~A. Le, F.~Wood, and S.~Whiteson.
+\newblock Deep variational reinforcement learning for POMDPs.
+\newblock In \emph{Proceedings of ICML}, pages 2117--2126, 2018.
+
+\bibitem{jaderberg2017unreal}
+M.~Jaderberg, V.~Mnih, W.~M. Czarnecki, T.~Schaul, J.~Z. Leibo, D.~Silver, and K.~Kavukcuoglu.
+\newblock Reinforcement learning with unsupervised auxiliary tasks.
+\newblock In \emph{Proceedings of ICLR}, 2017.
+
+\bibitem{kaelbling1998pomdp}
+L.~P. Kaelbling, M.~L. Littman, and A.~R. Cassandra.
+\newblock Planning and acting in partially observable stochastic domains.
+\newblock \emph{Artificial Intelligence}, 101(1--2):99--134, 1998.
+
+\bibitem{mcgrath2022alphazero}
+T.~McGrath, A.~Kapishnikov, N.~Toma\v{s}ev, A.~Pearce, M.~Wattenberg, D.~Hassabis, B.~Kim, U.~Paquet, and V.~Kramnik.
+\newblock Acquisition of chess knowledge in AlphaZero.
+\newblock \emph{Proceedings of the National Academy of Sciences}, 119(47):e2206625119, 2022.
+
+\bibitem{ng1999shaping}
+A.~Y. Ng, D.~Harada, and S.~Russell.
+\newblock Policy invariance under reward transformations: Theory and application to reward shaping.
+\newblock In \emph{Proceedings of ICML}, pages 278--287, 1999.
+
+\bibitem{schulman2017ppo}
+J.~Schulman, F.~Wolski, P.~Dhariwal, A.~Radford, and O.~Klimov.
+\newblock Proximal policy optimization algorithms.
+\newblock \emph{arXiv preprint arXiv:1707.06347}, 2017.
+
+\bibitem{wijmans2023maps}
+E.~Wijmans, M.~Savva, I.~Essa, S.~Lee, A.~S. Morcos, and D.~Batra.
+\newblock Emergence of maps in the memories of blind navigation agents.
+\newblock In \emph{Proceedings of ICLR}, 2023.
+
+\end{thebibliography}
+
+% =============================================================================
+\clearpage
+\appendix
+\normalsize
+
+\section{Pre-registration ledger and coverage}
+\label{app:prereg}
+
+Every confirmatory comparison was sealed with 5th/50th/95th percentile predictions and a named placebo gate before evaluation. Phase~I sealed its intervals without pilots. Phase~II first ran a short disjoint-seed magnitude pilot for each new quantity. Of 40 sealed predictions, 8 of 15 scored Phase~I predictions and 20 of 24 scored Phase~II predictions landed inside their 90\% intervals (Figure~\ref{fig:prereg}, Table~\ref{tab:prereg}), for \$1.21 of Phase~II paid compute. Piloted predictions were far better calibrated. The live-RL bar in Figure~\ref{fig:prereg} excludes the invalid known-answer seal.
+
+Seal \#6780 bound the known-answer probe MI, with sealed interval $[0.745, 1.075]$ bits. The observed $0.7707$ bits is inside that interval, but below the run's pre-set validity gate of $0.80$ bits, so the run is flagged \texttt{valid=false}. We count \#6780 as invalid and headline the gate-valid counts (live RL 7/7 scored, Phase~II 20/24). The raw interval counts are 8/8 and 21/25. All 12 width-matched shuffled-label nulls stayed at or below $-0.0095$ bits.
+
+Other invalid or caveated runs are as follows. The multi-step recall test (\#5117, \#5118) failed its memory-free placebo gate. Arm~A failed its named placebo on all three seeds (Section~\ref{sec:limits}). All 15 runs of the Phase~I causal test had one weights-only checkpoint resume mid-training, while the live-RL study ran without resumes. A strict placebo gate in the first zero-shot study flagged a small negative degradation on one cross-table actor, which the next study removed. The calibration pilots in Figure~\ref{fig:calibration} were stopped unsealed and are exploratory. The early probe predictions \#699 and \#705 were registered as plain ranges without a median (\texttt{docs/PREREGISTRATION.md}, commit \texttt{b64e174}).
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{figs_paper/prereg.pdf}
+  \caption{Share of sealed predictions inside their 90\% interval, by study.}
+  \label{fig:prereg}
+\end{figure}
+
+\begin{table}[H]
+  \centering
+  \caption{Pre-registration ledger. Phase~I seals were unpiloted, Phase~II seals were piloted. Arm~A is the auxiliary goal-suit loss and Arm~B the belief appended as raw features. $T_{\text{eval}}$ is the table of scripted opponents, $T_{\text{heldout}}$ the unseen one. \texttt{slot} arms use the per-suit value inputs, \texttt{raw} arms the raw features, and \texttt{exog} the opponent-only encoder. Phase~II: 20/24 scored seals inside the 90\% interval, \#6780 invalid.}
+  \label{tab:prereg}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{@{}lllll@{}}
+    \toprule
+    \textbf{Seal} & \textbf{Quantity} & \textbf{Sealed 90\% [q05, q95]} & \textbf{Observed (90\% CI)} & \textbf{Verdict} \\
+    \midrule
+    \multicolumn{5}{@{}l}{\textbf{Phase I (unpiloted, 8/15 inside 90\% interval)}} \\
+    \#699 & Transformer probe accuracy & 48--58\% (range) & 44.8\% & Miss low \\
+    \#705 & minGRU probe accuracy & 43--52\% (range) & 58.0\% & Miss high (random-init mirage) \\
+    \#5117, \#5118 & Multi-step recall (R1/R2) & $+15$ [0, $+38$] / $+10$ [$-2, +38$] pp & $+2.15$ / $-0.97$ pp & Invalid: placebo gate failed \\
+    \#5119 & Supervised GRU $-$ input probe & $+1.0$ [$-1.0, +6.0$] pp & $+9.82$ pp [8.97, 10.66] & Miss high, placebo valid \\
+    \#5441 & Oracle $-$ \texttt{none} & $+3.0$ [$-1.0, +10.0$] \$/g & $+73.77$ [72.10, 75.51] & Miss high ($7\times$), placebo valid \\
+    \#5442, \#5444 & Arm~B gain / closure ratio & $+1.0$ [$-3.0, +6.0$] / $0.30$ [$-0.5, 1.2$] & $+2.20$ / $0.030$ [0.016, 0.043] & Closure refuted \\
+    \#5443, \#5445--49 & Arm~A (auxiliary loss) & $+0.5$ [$-3.0, +5.0$] \$/g & $-0.79$ \$/g & Invalid: placebo $+2.16$ [1.34, 2.98] \\
+    \#6607 & Scripted trader, frozen belief & $+3.0$ [$-2.0, +15.0$] \$/g & $-23.14$ [$-25.80, -20.56$] & Refuted (oracle $+86.47$) \\
+    \midrule
+    \multicolumn{5}{@{}l}{\textbf{Phase II, value of information and zero-shot interface (7/9)}} \\
+    \#6705 & $\gamma$, \texttt{PPOv2}, $T_{\text{eval}}$ & 0.72 [0.52, 0.96] & 0.875 & Hit \\
+    \#6706 & $\delta$, time decay & 1.10 [0.75, 1.50] & 0.830 & Hit \\
+    \#6707 & $\gamma$, \texttt{AdaptiveMM} & 1.10 [0.85, 1.40] & 1.105 & Hit \\
+    \#6708 & $\gamma$, \texttt{PPOv2}, $T_{\text{heldout}}$ & 0.68 [0.48, 0.92] & 0.890 & Hit \\
+    \#6709 & Oracle gain ($I=2$, $t=0$) & 87.0 [76.0, 98.0] \$/g & 86.29 [83.39, 89.24] & Hit \\
+    \#6710 & Order-flow $\Delta$MI ($t=120$, unpiloted) & 0.12 [0.02, 0.30] bits & 1.0823 bits & Miss high (quote leakage) \\
+    \#6711 & Matched plug-in gain (unpiloted) & 6.0 [1.0, 16.0] \$/g & $+28.69$ [26.07, 31.41] & Miss high \\
+    \#6712 & Matched $-$ Arm~B, slots & 9.0 [2.0, 24.0] \$/g & $+22.25$ & Hit \\
+    \#6713 & Capture ratio & 0.45 [0.10, 0.90] & 0.673 & Hit \\
+    \midrule
+    \multicolumn{5}{@{}l}{\textbf{Phase II, trades vs.\ quotes and self-confounding (6/8)}} \\
+    \#6741 & Trades-only $\Delta$MI ($t=120$) & piloted & $+0.5339$ bits & Hit, placebo 0.0000 bits \\
+    \#6742 & Quotes-only $\Delta$MI ($t=120$) & 0.72 [0.45, 1.00] bits & 1.0008 bits & Miss high by 0.0008 \\
+    \#6743--46 & Trades-only gains (three tables) & piloted & $+22.91$ / $+18.08$ / $+5.30$ & 4/4 hits \\
+    \#6747 & Masking rescue, \texttt{Bayesian} recorder & piloted & $+19.72$ [16.59, 22.63] & Hit \\
+    \#6748 & Card counter $-$ hand prior & 5.0 [0.0, 10.5] \$/g & $-0.13$ [$-2.63, +2.41$] & Miss low (selection bias) \\
+    \midrule
+    \multicolumn{5}{@{}l}{\textbf{Phase II, live RL (7/7 scored, \#6780 invalid)}} \\
+    \#6773 & \texttt{slot\_exog} $-$ \texttt{raw\_exog} & [3, 27] & $+24.96$ [22.66, 27.16] & Hit \\
+    \#6774 & Shaped $-$ unshaped & [$-2$, 14] & $+1.67$ [$-0.33, +3.70$] & Hit \\
+    \#6775, \#6776 & \texttt{slot\_shaped} / \texttt{trades} $-$ \texttt{base} & [15.5, 40.5] / [9, 33] & $+24.22$ / $+11.46$ & 2/2 hits \\
+    \#6777 & \texttt{slot\_placebo} $-$ \texttt{base} & [$-11.5$, 5.5] & $+1.57$ [$-0.24, +3.33$] & Hit \\
+    \#6778, \#6779 & Self-play \texttt{slot\_shaped} / \texttt{trades\_shaped} $-$ \texttt{base} & [$-41, +1$] / [$-27, +7$] & $-26.42$ / $-26.14$ & 2/2 hits \\
+    \#6780 & Known-answer probe MI & [0.745, 1.075] bits & 0.7707 bits & Invalid: gate failed ($<0.80$) \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\section{Live RL reference results}
+\label{app:e2b}
+
+\begin{table}[H]
+  \centering
+  \caption{Live RL arms (3 seeds, 400 PPO updates, 3,000 paired deals per suite, 90\% CIs) and frozen zero-shot references. GRU MI is the cross-validated probe at the last tick, next to its shuffled-label null. \texttt{base\_cc} uses card counts, \texttt{raw\_exog} the opponent-only encoder as raw features, \texttt{slot\_exog} the same encoder in the per-suit value inputs, \texttt{\_shaped} adds reward for using the belief, \texttt{slot\_trades} uses a trades-only encoder, and \texttt{slot\_placebo} fills the inputs from the agent's own hand. ``4-way H2H'' plays the agents against each other.}
+  \label{tab:e2b}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{@{}lrrrrrr@{}}
+    \toprule
+    \textbf{Arm} & \textbf{$T_{\text{eval}}$ (\$/g)} & \textbf{$T_{\text{heldout}}$ (\$/g)} & \textbf{PPO self-play} & \textbf{4-way H2H} & \textbf{GRU MI (bits)} & \textbf{Null MI} \\
+    \midrule
+    \texttt{base\_cc} & $+15.31$ [13.10, 17.49] & $-1.48$ [$-3.11, +0.15$] & $+30.49$ [27.89, 32.97] & $+1.43$ [$-0.42, +3.21$] & $0.390$ & $-0.013$ \\
+    \texttt{raw\_exog} (128-d latent) & $+12.89$ [10.69, 15.14] & $-0.64$ [$-2.32, +0.96$] & $+22.22$ [19.89, 24.50] & $+3.42$ [1.75, 5.08] & $0.854$ & $-0.018$ \\
+    \texttt{slot\_exog} (16 slots) & $+37.85$ [35.87, 39.77] & $-1.74$ [$-3.34, -0.15$] & $+16.18$ [14.14, 18.25] & --- & $0.954$ & $-0.018$ \\
+    \texttt{slot\_exog\_shaped} & $+39.52$ [37.65, 41.41] & $-5.13$ [$-6.73, -3.53$] & $+4.06$ [1.63, 6.54] & $-3.80$ [$-5.34, -2.11$] & $0.972$ & $-0.046$ \\
+    \texttt{slot\_trades\_shaped} & $+26.77$ [24.84, 28.67] & $-6.72$ [$-8.16, -5.20$] & $+4.34$ [1.93, 6.65] & $-1.06$ [$-2.76, +0.53$] & $0.276$ & $-0.126$ \\
+    \texttt{slot\_placebo} (hand prior) & $+16.87$ [14.74, 18.90] & $-0.04$ [$-1.62, +1.50$] & $+18.32$ [16.23, 20.51] & --- & $0.180$ & $-0.019$ \\
+    \midrule
+    \textit{Zero-shot \texttt{PPOv2} (card count)} & $+14.05$ [11.90, 16.22] & $+0.65$ [$-0.93, +2.20$] & $+30.96$ [28.38, 33.42] & --- & --- & --- \\
+    \textit{Zero-shot (quotes + trades)} & $+48.68$ [47.15, 50.25] & $-7.58$ [$-9.46, -5.59$] & $-14.31$ [$-16.79, -11.74$] & --- & --- & --- \\
+    \textit{Zero-shot (trades only)} & $+35.13$ [33.33, 36.81] & $-5.26$ [$-6.78, -3.69$] & $-6.72$ [$-9.30, -4.18$] & --- & --- & --- \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\section{Additional figures}
+\label{app:figs}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{figs_paper/voi_tick.pdf}
+  \caption{Value of a goal-suit signal by reveal tick.}
+  \label{fig:voitick}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{figs_paper/mirage.pdf}
+  \caption{Last-tick probe accuracy before and after PPO training, by architecture.}
+  \label{fig:mirage}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figs_paper/example_game.pdf}
+  \caption{Belief in each suit over one example game (goal suit \Spade).}
+  \label{fig:example}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figs_paper/activations_heatmaps.pdf}
+  \caption{Hidden activations of three networks on the example game.}
+  \label{fig:heatmaps}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figs_paper/trap.pdf}
+  \caption{Trader gain with a full-view and an opponent-only encoder.}
+  \label{fig:trap}
+\end{figure}
+
+\section{Reproducibility}
+\label{app:repro}
+Phase~I artifacts are in the \texttt{results/} and \texttt{runs/} folders of the \texttt{figgie-rl} repository. Phase~II runs are tracked in MLflow. Every figure is drawn from these logs by \texttt{figs\_paper/make\_figs.py} and \texttt{figs\_paper/make\_teaser.py}, which share \texttt{figs\_paper/paper.mplstyle}.
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+  \item Value of information and zero-shot interface: run \texttt{05271003424a410b85fc490077657a36}, commit \texttt{cc1971393782}.
+  \item Trades vs.\ quotes: run \texttt{5827a47594684237a4d1202b22bd8103}, commit \texttt{054bf666d463}.
+  \item Live RL: run \texttt{397ec6e33e4f4f0aad24d52c0c582a37}, commit \texttt{33f91cd45311}.
+\end{itemize}
+
+\end{document}
