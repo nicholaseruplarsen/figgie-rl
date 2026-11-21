@@ -151,6 +151,10 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
 
 ## Standing rules
 
+- **Binding gates (from 2026-11-21).** Every scored result is passed through scripts/binding_verdict.py, sealed at
+  commit 6c40afc15f83. Any failed gate (a "valid": false, a false member of "gates", a failed placebo_gate, an
+  "invalid probe" verdict, or a PLACEBO=1 arm whose dollar CI90 excludes 0) sets that verdict to invalid. A failed
+  oracle placebo invalidates every arm. The sealed evaluators are unchanged, and reports quote the binding verdict.
 - **No seal without a pilot (from 2026-11-20).** A quantity can be sealed only if a pilot has measured it first.
   The pilot value, its job id and its game or seed range go into this file before the seal. The pilot range must
   be disjoint from the sealed range. Prompted by the belief-v2 placebo, whose sealed form would have failed.
