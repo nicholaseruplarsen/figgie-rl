@@ -138,6 +138,17 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
     then ran on to 200. A smoke E1 cell was killed after 2 tells and rerun: tells 0-4 were each recorded once and none
     were null.
 
+## E1 deviation: PROTEIN cells stop at the 4e8 anytime checkpoint (2026-11-21, logged before any results were read)
+
+- Paid CPU throughput was about 15M steps/h, measured on none-protein-adamw in lease 1. The plan assumed about 34M/h.
+  Taking all four PROTEIN cells to 8e8 needed about 2.60B more steps (about $13.7), against $5.37 left under the
+  $6.50 cap.
+- Decision (Demis, adopted by Geoff): every PROTEIN cell stops at the pre-registered 4e8 anytime checkpoint
+  (research_plan.tex l.63), so the 2×2 stays balanced. If the cap arrives first, every cell stops at the highest
+  equal checkpoint reached inside it.
+- P4–P7 are scored at 4e8 (or at that lower checkpoint), and every report states this deviation. The random cells
+  are read at the same checkpoint.
+
 ## Standing rules
 
 - **No seal without a pilot (from 2026-11-20).** A quantity can be sealed only if a pilot has measured it first.
