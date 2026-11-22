@@ -202,9 +202,9 @@ Does the fix hold against different opponents? No. The encoder was trained again
   \label{fig:selfplay}
 \end{figure}
 
-One causal test failed. In an earlier study we added an auxiliary loss that trained the PPO network to predict the goal suit, to test whether supervising the representation helps. Its placebo, the same loss with shuffled labels, changed profit by more than the pre-set tolerance on all three seeds. We treat that test as invalid rather than as a null result and make no claim about auxiliary losses.
+One causal test failed. In an earlier study we added an auxiliary loss that trained the PPO network to predict the goal suit, to test whether supervising the representation helps. Its placebo, the same loss with shuffled labels, changed profit by more than the pre-set tolerance on all three seeds. We treat that test as invalid rather than as a null result and make no claim about auxiliary losses. The placebo's effect may come from the extra loss acting as a regulariser, which we did not test.
 
-The scope is narrow. All results come from one game with one discrete hidden variable. The live-RL study uses three seeds and 400 updates per agent. Its known-answer probe check fell just short of its pre-set bar, so the probe values in Figure~\ref{fig:teaser} are indicative and probably read low (Appendix~\ref{app:prereg}).
+The scope is narrow. All results come from one game with one discrete hidden variable. The live-RL study uses three seeds and 400 updates per agent, fewer than our pilot found necessary for stable rankings, so the order of close agents could change with longer training. Its known-answer probe check fell just short of its pre-set bar, so the probe values in Figure~\ref{fig:teaser} are indicative and probably read low (Appendix~\ref{app:prereg}). The probe was also run on one seed only. The zero-shot interface study failed its placebo gates as well, so both studies give evidence rather than proof. We did not test a simpler rival to the per-suit inputs, a learned linear map from the encoder's output to the same inputs. The predictions for the live-RL study were recorded after its code was frozen and before launch, its pilot and test games do not overlap, and all three seeds exist.
 
 % =============================================================================
 \section{Discussion}
