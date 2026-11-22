@@ -149,6 +149,18 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
 - P4–P7 are scored at 4e8 (or at that lower checkpoint), and every report states this deviation. The random cells
   are read at the same checkpoint.
 
+## E1 deviation: every cell is scored at 1e8, not 4e8 (2026-11-22, logged before any 1e8 score was read)
+
+- Reason: the $6.50 PROTEIN budget cap. After lease 3 ($3.36 spent), the steps finished were none-protein-adamw 401M,
+  none-protein-muon 369M, mingru-protein-adamw 82M and mingru-protein-muon 82M. minGRU gained about 28M per cell in a
+  10.5 h lease, so reaching 2e8 would need about 3 more full leases, which is over the cap. 1e8 is the highest
+  common checkpoint that fits. Lease 4 (about $0.30) finishes minGRU trial 5 to get there.
+- All eight cells, random search included, are scored at 1e8 from their logged anytime curves (best-so-far
+  over trials whose cumulative cost_steps is at most 1e8). No cell is scored at 4e8 or 8e8.
+- If the curves show that 1e8 is shorter than the length needed to rank the variants (best-so-far still moving
+  by more than its CI, or the rank order changing after 1e8 in cells that ran longer), the tuner comparison is
+  marked exploratory.
+
 ## Standing rules
 
 - **Binding gates (from 2026-11-21).** Every scored result is passed through scripts/binding_verdict.py, sealed at
