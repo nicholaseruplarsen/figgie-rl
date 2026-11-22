@@ -19,32 +19,32 @@ d = json.loads(src.read_text())
 probes, arms = d["probes"]["arms"], d["eval"]["T_eval"]["arms"]
 
 BLUE, VERM, SKY, GREY = "#0072B2", "#D55E00", "#56B4E9", "#666666"  # Okabe-Ito, as in make_figs.py
-pts = [  # arm, label, colour, label offset (points)
-    ("base_cc", "card counts only\n(baseline)", GREY, (8, -16)),
-    ("slot_placebo", "hand-only control", GREY, (8, 6)),
-    ("slot_trades_shaped", "belief from trades only,\nfed in as per-suit values", SKY, (8, -4)),
-    ("raw_exog", "belief fed in as\nraw features", VERM, (8, -10)),
-    ("slot_exog", "same belief fed in\nas per-suit values", BLUE, (-95, 4)),
-    ("slot_exog_shaped", "…plus reward\nfor using it", BLUE, (6, 2)),
+pts = [  # arm, label, colour (top to bottom)
+    ("slot_exog_shaped", "Per-suit values + reward", BLUE),
+    ("slot_exog", "Per-suit values", BLUE),
+    ("raw_exog", "Raw features", VERM),
+    ("slot_trades_shaped", "Trades-only belief, per-suit", SKY),
+    ("slot_placebo", "Hand-only control", GREY),
+    ("base_cc", "Card counts (baseline)", GREY),
 ]
-
-fig, ax = plt.subplots(figsize=(5.0, 3.0))
-ax.axhline(0, color="#444444", lw=0.8, zorder=0)
-for arm, label, c, off in pts:
-    x = probes[arm]["239"]["probe_mi_bits"]
-    y = arms[arm]["gain_vs_base"]
-    lo, hi = arms[arm]["gain_vs_base_ci90"]
-    ax.errorbar(x, y, yerr=[[y - lo], [hi - y]], fmt="o", color=c, ms=6, lw=1)
-    ax.annotate(label, (x, y), xytext=off, textcoords="offset points", fontsize=7, color=c, va="center")
-xr, yr = probes["raw_exog"]["239"]["probe_mi_bits"], arms["raw_exog"]["gain_vs_base"]
-xs, ys = probes["slot_exog"]["239"]["probe_mi_bits"], arms["slot_exog"]["gain_vs_base"]
-ax.axvspan(xr - 0.025, xs + 0.025, color="#eeeeee", zorder=-1)
-ax.annotate("", xy=(xs, ys - 1.5), xytext=(xr, yr + 1.5), arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=1.4))
-ax.text((xr + xs) / 2 + 0.03, (yr + ys) / 2, f"same belief,\n{xr:.2f} \u2192 {xs:.2f} bits,\n+25 \\$/game", fontsize=7, color=BLUE, va="center")
-ax.set_xlim(0, 1.2)
-ax.set_ylim(-8, 30)
-ax.set_xlabel("Goal-suit information a probe reads from the agent's network (bits, max 2)")
-ax.set_ylabel("Profit gain over baseline\n(\\$/game, 90% CI)")
+fig, (a1, a2) = plt.subplots(1, 2, figsize=(5.4, 2.4), sharey=True, gridspec_kw=dict(wspace=0.08))
+ys = range(len(pts))[::-1]
+for y, (arm, label, c) in zip(ys, pts):
+    bits = probes[arm]["239"]["probe_mi_bits"]
+    g = arms[arm]["gain_vs_base"]; lo, hi = arms[arm]["gain_vs_base_ci90"]
+    a1.barh(y, bits, color=c, height=0.6)
+    a2.barh(y, g, color=c, height=0.6, xerr=[[g - lo], [hi - g]], error_kw=dict(lw=0.8, capsize=2))
+for ax in (a1, a2):
+    ax.axhspan(ys[2] - 0.45, ys[1] + 0.45, color="#eeeeee", zorder=-1)
+    ax.grid(axis="y", visible=False)
+a1.set_yticks(list(ys)); a1.set_yticklabels([p[1] for p in pts], fontsize=7)
+a1.set_xlim(0, 1.05); a1.set_title("What the agent knows", fontsize=8, loc="left", fontweight="normal")
+a1.set_xlabel("Goal-suit information (bits)")
+a2.axvline(0, color="#444444", lw=0.8)
+from matplotlib.patches import Patch
+a2.legend(handles=[Patch(color="#eeeeee", label="same belief, two inputs")], loc="lower right", fontsize=6.5, frameon=False)
+a2.set_title("What the agent earns", fontsize=8, loc="left", fontweight="normal")
+a2.set_xlabel("Profit gain over baseline (\\$/game)")
 out = Path(__file__).with_name("teaser.pdf")
 fig.savefig(out)
 print("wrote", out)
