@@ -161,6 +161,15 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
   by more than its CI, or the rank order changing after 1e8 in cells that ran longer), the tuner comparison is
   marked exploratory.
 
+## E2 retired; P1–P6 retired unscored (2026-11-25, CRO ruling by Demis)
+
+- E2 (the multi-seed confirmation of the E1 winners) will not run, on paid or free compute. The reason is opportunity
+  cost: the primary question is the belief-to-action gap, and E1 already showed Muon − AdamW ≈ 0 (−0.63 $/game) and
+  all four PROTEIN cells peaking on the same trial-3 proposal.
+- P1–P3 (read from the E2 probe) and P4–P6 (read from E2 means by e2_score.py) are retired and unscored. They are
+  not pending or overdue. P7 is reported from E1 at 1e8 (0.655), with the deviation above.
+- E1 is reported on its own at 1e8 by scripts/e1_at_budget.py (commit 82d93a6), as exploratory input, not as P4/P5.
+
 ## Standing rules
 
 - **Binding gates (from 2026-11-21).** Every scored result is passed through scripts/binding_verdict.py, sealed at
