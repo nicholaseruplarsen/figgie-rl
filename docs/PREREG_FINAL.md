@@ -170,6 +170,18 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
   not pending or overdue. P7 is reported from E1 at 1e8 (0.655), with the deviation above.
 - E1 is reported on its own at 1e8 by scripts/e1_at_budget.py (commit 82d93a6), as exploratory input, not as P4/P5.
 
+## E1 is exploratory (2026-11-25, the 1e8 deviation's first trigger fired)
+
+- The best-so-far was still moving by more than its CI after 1e8. none-random-adamw went 14.06 → 15.92 (2e8)
+  → 16.90 (8e8), +2.84 against a single-trial 95% CI of about ±2.3, and the none-core PROTEIN − random gap fell
+  from +4.4 at 1e8 to about +1.5 at 8e8. No rank flipped (second trigger), but one trigger is enough, so the tuner
+  comparison is labelled exploratory.
+- 95% intervals at 1e8: PROTEIN − random +6.20 ± 1.61, Muon − AdamW −0.63 ± 1.61. These cover evaluation noise
+  only (each winner's score_ci95, combined in quadrature, pairs treated as independent). They ignore the
+  winner's-curse selection and the shared draw below, so they are too narrow.
+- All four PROTEIN wins come from the same trial-3 proposal (one set of parameters, chosen identically in every
+  cell). They are one draw, not four replications.
+
 ## Standing rules
 
 - **Binding gates (from 2026-11-21).** Every scored result is passed through scripts/binding_verdict.py, sealed at
