@@ -133,9 +133,61 @@ test checks whether giving PPO the information, or a dense signal toward it, cha
     its EMA win rates and the aux head, and a resume restores all of them. Each resume writes a row
     `resumed: true, resumed_at_update: N` to the run's train_log.jsonl. E1 copies it into the trial's row in
     trials.jsonl, so the ledger shows which trials resumed and where.
+  - Resume proof (compute-01, 2026-11-20): a CPU run was killed with SIGTERM at update 60 and resumed from latest.pt
+    at update 50 with full state (optimizer present, PFSP pool of 16 with its win rates, pool_next_id 49). Updates
+    then ran on to 200. A smoke E1 cell was killed after 2 tells and rerun: tells 0-4 were each recorded once and none
+    were null.
+
+## E1 deviation: PROTEIN cells stop at the 4e8 anytime checkpoint (2026-11-21, logged before any results were read)
+
+- Paid CPU throughput was about 15M steps/h, measured on none-protein-adamw in lease 1. The plan assumed about 34M/h.
+  Taking all four PROTEIN cells to 8e8 needed about 2.60B more steps (about $13.7), against $5.37 left under the
+  $6.50 cap.
+- Decision (Demis, adopted by Geoff): every PROTEIN cell stops at the pre-registered 4e8 anytime checkpoint
+  (research_plan.tex l.63), so the 2×2 stays balanced. If the cap arrives first, every cell stops at the highest
+  equal checkpoint reached inside it.
+- P4–P7 are scored at 4e8 (or at that lower checkpoint), and every report states this deviation. The random cells
+  are read at the same checkpoint.
+
+## E1 deviation: every cell is scored at 1e8, not 4e8 (2026-11-22, logged before any 1e8 score was read)
+
+- Reason: the $6.50 PROTEIN budget cap. After lease 3 ($3.36 spent), the steps finished were none-protein-adamw 401M,
+  none-protein-muon 369M, mingru-protein-adamw 82M and mingru-protein-muon 82M. minGRU gained about 28M per cell in a
+  10.5 h lease, so reaching 2e8 would need about 3 more full leases, which is over the cap. 1e8 is the highest
+  common checkpoint that fits. Lease 4 (about $0.30) finishes minGRU trial 5 to get there.
+- All eight cells, random search included, are scored at 1e8 from their logged anytime curves (best-so-far
+  over trials whose cumulative cost_steps is at most 1e8). No cell is scored at 4e8 or 8e8.
+- If the curves show that 1e8 is shorter than the length needed to rank the variants (best-so-far still moving
+  by more than its CI, or the rank order changing after 1e8 in cells that ran longer), the tuner comparison is
+  marked exploratory.
+
+## E2 retired; P1–P6 retired unscored (2026-11-25, CRO ruling by Demis)
+
+- E2 (the multi-seed confirmation of the E1 winners) will not run, on paid or free compute. The reason is opportunity
+  cost: the primary question is the belief-to-action gap, and E1 already showed Muon − AdamW ≈ 0 (−0.63 $/game) and
+  all four PROTEIN cells peaking on the same trial-3 proposal.
+- P1–P3 (read from the E2 probe) and P4–P6 (read from E2 means by e2_score.py) are retired and unscored. They are
+  not pending or overdue. P7 is reported from E1 at 1e8 (0.655), with the deviation above.
+- E1 is reported on its own at 1e8 by scripts/e1_at_budget.py (commit 82d93a6), as exploratory input, not as P4/P5.
+
+## E1 is exploratory (2026-11-25, the 1e8 deviation's first trigger fired)
+
+- The best-so-far was still moving by more than its CI after 1e8. none-random-adamw went 14.06 → 15.92 (2e8)
+  → 16.90 (8e8), +2.84 against a single-trial 95% CI of about ±2.3, and the none-core PROTEIN − random gap fell
+  from +4.4 at 1e8 to about +1.5 at 8e8. No rank flipped (second trigger), but one trigger is enough, so the tuner
+  comparison is labelled exploratory.
+- 95% intervals at 1e8: PROTEIN − random +6.20 ± 1.61, Muon − AdamW −0.63 ± 1.61. These cover evaluation noise
+  only (each winner's score_ci95, combined in quadrature, pairs treated as independent). They ignore the
+  winner's-curse selection and the shared draw below, so they are too narrow.
+- All four PROTEIN wins come from the same trial-3 proposal (one set of parameters, chosen identically in every
+  cell). They are one draw, not four replications.
 
 ## Standing rules
 
+- **Binding gates (from 2026-11-21).** Every scored result is passed through scripts/binding_verdict.py, sealed at
+  commit 6c40afc15f83. Any failed gate (a "valid": false, a false member of "gates", a failed placebo_gate, an
+  "invalid probe" verdict, or a PLACEBO=1 arm whose dollar CI90 excludes 0) sets that verdict to invalid. A failed
+  oracle placebo invalidates every arm. The sealed evaluators are unchanged, and reports quote the binding verdict.
 - **No seal without a pilot (from 2026-11-20).** A quantity can be sealed only if a pilot has measured it first.
   The pilot value, its job id and its game or seed range go into this file before the seal. The pilot range must
   be disjoint from the sealed range. Prompted by the belief-v2 placebo, whose sealed form would have failed.
